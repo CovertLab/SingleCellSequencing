@@ -9,7 +9,7 @@
 
 # Print out useful (useless?) job-related information
 echo ------------------------------------------------------
-#echo -n 'Job is running on node '; cat $PBS_NODEFILE
+echo -n 'Job is running on node '; cat $PBS_NODEFILE
 echo ------------------------------------------------------
 echo PBS: qsub is running on $PBS_O_HOST
 echo PBS: originating queue is $PBS_O_QUEUE
