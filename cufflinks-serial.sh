@@ -26,15 +26,17 @@ fi
 
 #########################
 
+echo "$(date): Running $(basename $0)"
+
 #########################
 ## Process files
 
-echo "Processing BAM files in ${TOPHAT_OUTPUT_DIR}"
+echo "$(date): Processing BAM files in ${TOPHAT_OUTPUT_DIR}"
 echo
 
 echo "========================="
 
-find "${TOPHAT_OUTPUT_DIR}" -type f -name "*.bam" -print0 | \
+find "${TOPHAT_OUTPUT_DIR}" -type f -name "*.bam" -print0 | sort -z | \
 while IFS='' read -r -d '' FULL_FILE; do
 
 	# Get just the filename (strip off the directory)
@@ -42,12 +44,13 @@ while IFS='' read -r -d '' FULL_FILE; do
 
 	# Strip off the file extension
 	# See http://stackoverflow.com/a/965069/1647819
-	FILE_NO_EXT="${FULL_FILE%%.*}"
+	FILE_NO_EXT="${BASE_FILE%.*}"
 
 	# Define output directory for this cufflinks run
 	THIS_OUTPUT_DIR="${CUFFLINKS_OUTPUT_DIR}/${FILE_NO_EXT}"
 
-	echo "+++++ Processing ${FULL_FILE}"
+	echo "+++++ $(date): Processing ${FULL_FILE}"
+
 	cufflinks -o "${THIS_OUTPUT_DIR}" "${FULL_FILE}"
 
 	echo
@@ -57,3 +60,5 @@ echo "========================="
 echo
 
 #########################
+
+echo "$(date): Done running $(basename $0)"
