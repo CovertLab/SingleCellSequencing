@@ -65,6 +65,10 @@ else
 	WORK_DIR="/tmp"
 fi
 
+TIME="$(date "+%Y%m%d.%H%M%S.%N")"
+
+WORK_DIR="${WORK_DIR}/${TIME}.${PBS_JOBID}.${ARRAY_ID}"
+
 CODE_DIR="$PBS_O_WORKDIR" # Assumes job submission from SingleCellSequencing
 
 cd ${CODE_DIR}
@@ -90,6 +94,8 @@ stagein()
 	echo
 	echo "$(date): Copying files to work directory ${WORK_DIR}"
 
+	mkdir -p ${WORK_DIR}
+
 	cd ${WORK_DIR}
 	scp -r "${CODE_DIR}/${FULL_FILE}" .
 }
@@ -114,6 +120,10 @@ stageout()
 	rm -fr "${BASE_FILE}"
 	echo "+++++ $(date): Removing ${THIS_OUTPUT_DIR_LOCAL}"
 	rm -fr "${THIS_OUTPUT_DIR_LOCAL}"
+
+	cd /
+	echo "+++++ $(date): Removing ${WORK_DIR}"
+	rm -fr "${WORK_DIR}"
 }
 
 early()
