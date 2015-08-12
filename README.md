@@ -2,7 +2,21 @@
 
 ## Python
 
-On Sherlock, run `pyenv local dvv_seq`
+On Sherlock, run `pyenv local dvv_seq` in your cloned directory
+
+## bash_profile
+
+Add the following to your `$HOME/.bash_profile` (using the appropriate path to your cloned directory):
+
+```bash
+export PYTHONPATH="/path/to/SingleCellSequencing:$PYTHONPATH"
+```
+
+To import the necessary shared libraries, you will need to execute the following *each time* after you log in to Sherlock (alternatively, you can add it as a line to your `$HOME/.bash_profile`):
+
+```bash
+module load dvv_seq
+```
 
 ## MongoDB
 
@@ -33,3 +47,44 @@ On Sherlock, run `pyenv local dvv_seq`
 * Run `python initialize.py`
 
 * Run `lpad reset` and choose `Y`es if prompted
+
+
+# Usage
+
+## Queue
+
+To queue a set of directories to process, run:
+
+```bash
+python fw_queue.py /path/to/directory/containing/libraries
+```
+
+To see a list of help options, run:
+
+```bash
+python fw_queue.py --help
+```
+
+## Run interactively
+
+To run fireworks interactively (after having queued your jobs), run:
+
+```bash
+rlaunch rapidfire
+```
+
+This is useful for debugging, but you probably don't want to use it in production because it runs serially.
+
+Do not do this on a login node (your tasks are too computationally expensive)
+
+## Run using the SLURM Scheduler
+
+To run using the scheduler:
+
+```bash
+qlaunch -r rapidfire --nlaunches infinite --sleep 5
+```
+
+This command will run forever until you `Ctrl-C` to kill it once you see that all the output and analysis files have been generated.
+
+`qlaunch` is relatively lightweight, so you can probably get away with running it on a login node.
