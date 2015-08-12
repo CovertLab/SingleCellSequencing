@@ -35,11 +35,11 @@ def parse_filename(filename):
 	cell_ID = filename.split('_')[0]
 	return cell_ID
 
-def make_directories(direc_name):
-	direcs_to_make = ['unzipped', 'trimmed','aligned','pythonized']
+def make_directories(direc_name, direcs_to_make = None):
+	direcs_to_make = direcs_to_make or ['unzipped', 'trimmed', 'aligned', 'pythonized']
 	for direc in direcs_to_make:
-		if not os.path.exists(direc_name + direc):
-			os.makedirs(direc_name + direc)
+		if not os.path.exists(os.path.join(direc_name, direc)):
+			os.makedirs(os.path.join(direc_name, direc))
 
 def unzip_file(filename, input_direc = None, output_direc = None):
 	cmd = ['gunzip', input_direc + filename]
@@ -65,15 +65,19 @@ def load_STAR():
 	cmd = ['module', 'load', 'STAR']
 	run_cmd(cmd)
 
-def trim_reads(direc_name, input_filename):
-	left_file = direc_name + 'unzipped/' + input_filename + '_R1_001.fastq'
-	right_file = direc_name + 'unzipped/' + input_filename + '_R2_001.fastq'
+def trim_reads(direc_name, input_filename, unzipped_name = None, trimmed_name = None):
+	unzipped_name = unzipped_name or "unzipped"
+	trimmed_name = trimmed_name or "trimmed"
+
+	left_file = os.path.join(direc_name, unzipped_name, input_filename + '_R1_001.fastq')
+	right_file = os.path.join(direc_name, unzipped_name, input_filename + '_R2_001.fastq')
 
 	ofn_temp = input_filename.split('_')
 	output_filename = ofn_temp[0] + '_' + ofn_temp[1]
 
-	output_left = direc_name + 'trimmed/' + output_filename + '_R1_trimmed.fq'
-	output_right = direc_name + 'trimmed/' + output_filename + '_R2_trimmed.fq'
+	output_left = os.path.join(direc_name, trimmed_name, output_filename + '_R1_trimmed.fq')
+	output_right = os.path.join(direc_name, trimmed_name, output_filename + '_R2_trimmed.fq')
+
 	if not os.path.exists(output_left):
 		if not os.path.exists(output_right):
 			nextera_file = '/share/PI/mcovert/downloads/bbmap_34.33/resources/nextera.fa.gz'
