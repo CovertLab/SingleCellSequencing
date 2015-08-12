@@ -1,0 +1,19 @@
+# pyenv python version #
+########################
+.python-version
+
+# files created from templates #
+################################
+my_launchpad.yaml
+my_qadapter.yaml
+
+
+# Fireworks output #
+####################
+launcher_*
+block_*
+FW.json
+
+# Python bytecode #
+###################
+*.pyc
