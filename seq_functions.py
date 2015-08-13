@@ -122,6 +122,13 @@ def run_STAR(filename):
 	option_name[0] = ' --runThreadN '
 	option[0] = '8'
 
+def run_kalliso_index(input_filename, output_filename):
+	cmd = ['kallisto', 'index', '-i', output_filename, input_filename]
+	run(cmd)
+
+def run_kallisto_quant(index_filename, output_filename, pair1, pair2):
+	cmd = ['kallisto', 'quant', '-i', index_filename, '-o', output_filename, pair1, pair2]
+
 def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = None):
 
 	"""
