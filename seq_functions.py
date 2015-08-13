@@ -12,6 +12,9 @@ import datetime
 import yaml
 import fnmatch
 import shlex
+import numpy
+import scipy
+import scipy.io as sio 
 
 """
 Define functions
@@ -35,11 +38,11 @@ def parse_filename(filename):
 	cell_ID = filename.split('_')[0]
 	return cell_ID
 
-def make_directories(direc_name, direcs_to_make = None):
-	direcs_to_make = direcs_to_make or ['unzipped', 'trimmed', 'aligned', 'pythonized']
+def make_directories(direc_name):
+	direcs_to_make = ['unzipped', 'trimmed','aligned','pythonized']
 	for direc in direcs_to_make:
-		if not os.path.exists(os.path.join(direc_name, direc)):
-			os.makedirs(os.path.join(direc_name, direc))
+		if not os.path.exists(direc_name + direc):
+			os.makedirs(direc_name + direc)
 
 def unzip_file(filename, input_direc = None, output_direc = None):
 	cmd = ['gunzip', input_direc + filename]
@@ -57,27 +60,15 @@ def unzip_rawdata(direc_name):
 			if not os.path.exists(unzip_direc + seq_file[:,-3]):
 				unzip_file(seq_file, input_direc = raw_data_direc, output_direc = unzip_direc)
 
-def load_bbmap():
-	cmd = ['module', 'load', 'bbmap']
-	run_cmd(cmd)
-
-def load_STAR():
-	cmd = ['module', 'load', 'STAR']
-	run_cmd(cmd)
-
-def trim_reads(direc_name, input_filename, unzipped_name = None, trimmed_name = None):
-	unzipped_name = unzipped_name or "unzipped"
-	trimmed_name = trimmed_name or "trimmed"
-
-	left_file = os.path.join(direc_name, unzipped_name, input_filename + '_R1_001.fastq')
-	right_file = os.path.join(direc_name, unzipped_name, input_filename + '_R2_001.fastq')
+def trim_reads(direc_name, input_filename):
+	left_file = direc_name + 'unzipped/' + input_filename + '_R1_001.fastq'
+	right_file = direc_name + 'unzipped/' + input_filename + '_R2_001.fastq'
 
 	ofn_temp = input_filename.split('_')
 	output_filename = ofn_temp[0] + '_' + ofn_temp[1]
 
-	output_left = os.path.join(direc_name, trimmed_name, output_filename + '_R1_trimmed.fq')
-	output_right = os.path.join(direc_name, trimmed_name, output_filename + '_R2_trimmed.fq')
-
+	output_left = direc_name + 'trimmed/' + output_filename + '_R1_trimmed.fq'
+	output_right = direc_name + 'trimmed/' + output_filename + '_R2_trimmed.fq'
 	if not os.path.exists(output_left):
 		if not os.path.exists(output_right):
 			nextera_file = '/share/PI/mcovert/downloads/bbmap_34.33/resources/nextera.fa.gz'
@@ -123,8 +114,6 @@ def generate_genome_index():
 
 	print cmd
 	run_cmd(cmd)
-
-	return
 
 def run_STAR(filename):
 	option_name = []
@@ -257,3 +246,54 @@ def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = No
 		no_spikein_reads += counts[ gene_id ]
 
 	return coverage, counts, no_unmapped_reads, no_mouse_reads, no_spikein_reads
+
+def load_matfiles(input_direc = None):
+	file_list = os.listdir(input_direc)
+	matfiles = []
+	for matfile in file_list:
+		if fnmatch.fnmatch(matfile, r'*.mat'):
+			time = int(matfile.split('_')[0])
+			dynamics_file = sio.loadmat(input_direc + matfile)
+			matfiles += [[dynamics_file, time]]
+	return matfiles
+
+class dynamics_class():
+	def __init__(self, matfiles):
+		dynamics_dict = {}
+		chip_no_dict = {}
+		capture_site_dict = {} 
+		num_of_cells_in_well_dict = {}
+		time_point_dict = {}
+		for matfile in matfiles:
+			for row in xrange(matfile[0].shape[0]):
+				library_id = matfile[0][row, 1]
+				cell_id = matfile[0][row, 2]
+
+				dict_loc = str(library_id) + '-' + str(cell_id)
+
+				dynamics_dict{dict_loc} = matfile[0][row, 5:]
+				chip_no_dict{dict_loc} = matfile[0][row, 0]
+				capture_site_dict{dict_loc} = matfile[0][row, 3]
+				num_of_cells_in_well_dict{dict_loc} = matfile[0][row, 4]
+				time_point_dict{dict_loc} = matfile[1]
+
+		self.dynamics_dict = dynamics_dict
+		self.chip_no_dict = chip_no_dict
+		self.capture_site_dict = capture_site_dict
+		self.num_of_cells_in_well_dict = num_of_cells_in_well_dict
+		self.time_point_dict = time_point_dict
+
+class cell_object():
+	def __init__(self, direc = None, samfile_name = None, dictionary = None, mouse_gtf_loc = None, spikein_gtf_loc = None):
+		cell_id = parse_filename(samfile_name)
+		self.NFkB_dynamics = dictionary.dynamics_dict[cell_id]
+		self.chip_number = dictionary.chip_no_dict[cell_id]
+		self.capture_site = dictionary.capture_site_dict[cell_id]
+		self.time_point = time_point_dict[cell_id]
+		self.number_of_cells = num_of_cells_in_well_dict[cell_id]
+
+		coverage, counts, num_unmapped_reads, num_mouse_reads, num_spikein_reads = load_sequence_counts(samfile_name = None, mouse_gtf = mouse_gtf_loc, spikein_gtf = spikein_gtf_loc)
+		self.coverage = coverage
+		self.counts = counts
+		self.num_unmapped_reads = num_unmapped_reads
+		self.num_spikein_reads = num_spikein_reads
