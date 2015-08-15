@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from fireworks import Firework, LaunchPad, Workflow, ScriptTask
-from firetasks import TrimTask
+from firetasks import TrimTask, AlignTask
 import seq_functions
 import argparse
 import os
@@ -15,6 +15,7 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 
 	library_dirs = [os.path.join(sequencing_directory, library_prefix + str(i + 1)) for i in xrange(num_libraries)]
 	subdirs = ['unzipped', 'trimmed', 'aligned', 'pythonized']
+
 	for library_dir in library_dirs:
 		seq_functions.make_directories(library_dir, subdirs)
 
@@ -39,6 +40,17 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 			)
 		workflow_fireworks.append(fw_trim)
 		workflow_dependencies[fw_gunzip].append(fw_trim)
+
+		name = "Align_%s" % os.path.basename(library_dir)
+		fw_align = Firework(
+			[
+				AlignTask(library_path = library_dir, trimmed_name = "trimmed", aligned_name = "aligned")
+			],
+			name = name,
+			spec = {"_queueadapter": {"job_name": name}},
+			)
+		workflow_fireworks.append(fw_align)
+		workflow_dependencies[fw_trim].append(fw_align)
 
 	lpad.add_wf(
 		Workflow(workflow_fireworks, links_dict = workflow_dependencies)

@@ -18,5 +18,5 @@ class TrimTask(FireTaskBase):
 			sft = seq_file.split('.')[0]
 			sft2 = sft.split('_')
 			seq_file_name = sft2[0] + '_' + sft2[1] + '_' + sft2[2] 
-			print seq_file_name
+			print r'Trimming ' + seq_file_name
 			seq_functions.trim_reads(self["library_path"], seq_file_name, unzipped_name = self["unzipped_name"], trimmed_name = self["trimmed_name"])

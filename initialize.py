@@ -51,7 +51,7 @@ def main():
 
 	my_qadapter_text = t.render({
 		"LOGDIR_QADAPTER": logdir_qadapter,
-		"WCECOLI_PATH": single_cell_sequencing_path,
+		"SCS_PATH": single_cell_sequencing_path,
 		})
 
 	h = open(my_qadapter, "w")

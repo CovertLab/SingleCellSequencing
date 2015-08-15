@@ -38,16 +38,15 @@ def parse_filename(filename):
 	cell_ID = filename.split('_')[0]
 	return cell_ID
 
-def make_directories(direc_name):
-	direcs_to_make = ['unzipped', 'trimmed','aligned','pythonized']
-	for direc in direcs_to_make:
-		if not os.path.exists(direc_name + direc):
-			os.makedirs(direc_name + direc)
+def make_directories(direc_name, subdirecs_to_make = None):
+	for direc in subdirecs_to_make:
+		if not os.path.exists(os.path.join(direc_name, direc)):
+			os.makedirs(os.path.join(direc_name, direc))
 
 def unzip_file(filename, input_direc = None, output_direc = None):
 	cmd = ['gunzip', input_direc + filename]
 	run_cmd(cmd)
-	cmd = ['mv', input_direc + filename[:-3], output_direc + filename[:-3]]
+	cmd = ['cp', input_direc + filename[:-3], output_direc + filename[:-3]]
 	run_cmd(cmd)
 
 def unzip_rawdata(direc_name):
@@ -60,15 +59,18 @@ def unzip_rawdata(direc_name):
 			if not os.path.exists(unzip_direc + seq_file[:,-3]):
 				unzip_file(seq_file, input_direc = raw_data_direc, output_direc = unzip_direc)
 
-def trim_reads(direc_name, input_filename):
-	left_file = direc_name + 'unzipped/' + input_filename + '_R1_001.fastq'
-	right_file = direc_name + 'unzipped/' + input_filename + '_R2_001.fastq'
+def trim_reads(direc_name, input_filename, unzipped_name = 'unzipped', trimmed_name = 'trimmed' ):
+	
+	left_file = os.path.join(direc_name, unzipped_name, input_filename + '_R1_001.fastq')
+	right_file = os.path.join(direc_name, unzipped_name, input_filename + '_R2_001.fastq')
+
 
 	ofn_temp = input_filename.split('_')
 	output_filename = ofn_temp[0] + '_' + ofn_temp[1]
 
-	output_left = direc_name + 'trimmed/' + output_filename + '_R1_trimmed.fq'
-	output_right = direc_name + 'trimmed/' + output_filename + '_R2_trimmed.fq'
+	output_left = os.path.join(direc_name, trimmed_name, output_filename + '_R1_trimmed.fq')
+	output_right = os.path.join(direc_name, trimmed_name, output_filename + '_R2_trimmed.fq')
+
 	if not os.path.exists(output_left):
 		if not os.path.exists(output_right):
 			nextera_file = '/share/PI/mcovert/downloads/bbmap_34.33/resources/nextera.fa.gz'
@@ -122,12 +124,55 @@ def run_STAR(filename):
 	option_name[0] = ' --runThreadN '
 	option[0] = '8'
 
-def run_kalliso_index(input_filename, output_filename):
+def run_kallisto_index(input_filename, output_filename):
 	cmd = ['kallisto', 'index', '-i', output_filename, input_filename]
-	run(cmd)
+	run_cmd(cmd)
 
-def run_kallisto_quant(index_filename, output_filename, pair1, pair2):
-	cmd = ['kallisto', 'quant', '-i', index_filename, '-o', output_filename, pair1, pair2]
+def kallisto_direc(direc_name):
+	output_directory = os.path.join(direc_name, 'align')
+	file_list = os.listdir(os.path.join(direc_name,'trimmed'))
+	for seq_file in file_list:
+		sft = seq_file.split('.')[0]
+		sft2 = sft.split('_')
+		seq_file_name = sft[0] + '_' + sft2[1]
+		if not os.path.exists(os.path.join(output_directory, seq_file_name + '.sam')):
+			run_kallisto_quant(direc_name, seq_file_name)
+
+def run_kallisto_quant(direc_name, input_filename, index_filename = '/scratch/PI/mcovert/dvanva/sequencing/reference_sequences/mus_musculus_ensembl_r81_index', trimmed_name = 'trimmed', aligned_name = 'aligned'): #, output_directory, output_filename, pair1, pair2):
+	input_directory = os.path.join(direc_name,trimmed_name)
+	output_directory = os.path.join(direc_name, aligned_name)
+
+	pair1 = os.path.join(input_directory, input_filename+'_R1_trimmed.fq')
+	pair2 = os.path.join(input_directory, input_filename+'_R2_trimmed.fq')
+	cmd = ['kallisto', 'quant', '-i', index_filename, '-o', output_directory, '--pseudobam', pair1, pair2]
+	
+	# Use kallisto to align reads to the transcriptome and output the pseudoalignment to a sam file
+	kal_out = run_cmd(cmd)
+	write_file(os.path.join(output_directory, input_filename + '.sam'), kal_out)
+	
+	# Move files to the output directory
+	h5_name = os.path.join(output_directory, input_filename+'.h5')
+	cmd = ['mv', os.path.join(output_directory, 'abundance.h5'), h5_name]
+	run_cmd(cmd)
+	
+	tsv_name = os.path.join(output_directory, input_filename+'.tsv')
+	cmd = ['mv', os.path.join(output_directory, 'abundance.tsv'), tsv_name]
+	run_cmd(cmd)
+
+	run_info_name = os.path.join(output_directory, input_filename+'_runinfo.json')
+	cmd = ['mv', os.path.join(output_directory, 'run_info.json'), run_info_name]
+	run_cmd(cmd)
+
+def run_kallisto_test():
+	direc_name = '/scratch/PI/mcovert/dvanva/sequencing/library1'
+	input_filename = '1-10_S14'
+	run_kallisto_quant(direc_name, input_filename)
+
+	# cmd = 'kallisto quant -i /scratch/PI/mcovert/dvanva/sequencing/reference_sequences/mus_musculus_index -o /scratch/PI/mcovert/dvanva/sequencing/library1 --pseudobam /scratch/PI/mcovert/dvanva/sequencing/library1/trimmed/1-10_S14_R1_trimmed.fq /scratch/PI/mcovert/dvanva/sequencing/library1/trimmed/1-10_S14_R2_trimmed.fq'
+	# cmd_temp = shlex.split(cmd)
+	# print cmd_temp
+	# kal_out = run_cmd(cmd_temp)
+	# write_file('/scratch/PI/mcovert/dvanva/sequencing/kal_out.sam', kal_out)
 
 def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = None):
 
@@ -278,11 +323,11 @@ class dynamics_class():
 
 				dict_loc = str(library_id) + '-' + str(cell_id)
 
-				dynamics_dict{dict_loc} = matfile[0][row, 5:]
-				chip_no_dict{dict_loc} = matfile[0][row, 0]
-				capture_site_dict{dict_loc} = matfile[0][row, 3]
-				num_of_cells_in_well_dict{dict_loc} = matfile[0][row, 4]
-				time_point_dict{dict_loc} = matfile[1]
+				dynamics_dict[dict_loc] = matfile[0][row, 5:]
+				chip_no_dict[dict_loc] = matfile[0][row, 0]
+				capture_site_dict[dict_loc] = matfile[0][row, 3]
+				num_of_cells_in_well_dict[dict_loc] = matfile[0][row, 4]
+				time_point_dict[dict_loc] = matfile[1]
 
 		self.dynamics_dict = dynamics_dict
 		self.chip_no_dict = chip_no_dict
