@@ -174,6 +174,24 @@ def run_kallisto_test():
 	# kal_out = run_cmd(cmd_temp)
 	# write_file('/scratch/PI/mcovert/dvanva/sequencing/kal_out.sam', kal_out)
 
+def sort_sam_files(direc_name, aligned_direc = 'aligned', bammed_direc = 'bammed', sorted_direc = 'sorted'):
+	file_list = os.listdir(os.path.join(direc_name,aligned_direc))
+	for seq_file in file_list:
+		if fnmatch.fnmatch(seq_file, r'*.sam'):
+			input_file = os.path.join(direc_name, aligned_direc, seq_file)
+			seq_file_split = seq_file.split('_')
+			reg_name = seq_file_split[0] + '_' + seq_file_split[1][:-4] + '.bam'
+			sorted_name = seq_file_split[0] + '_' + seq_file_split[1][:-4] + '_sorted'
+			output_file = os.path.join(direc_name, bammed_direc, reg_name)
+			sorted_file = os.path.join(direc_name, sorted_direc, sorted_name)
+			cmd = ['samtools', 'view', '-bS', input_file] 
+			print cmd
+			bam_out = run_cmd(cmd)
+			write_file(output_file, bam_out)
+			cmd = ['samtools','sort','-n', output_file, sorted_file]
+			print cmd
+			run_cmd(cmd)
+
 def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = None):
 
 	"""

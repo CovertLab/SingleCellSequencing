@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
 from fireworks import Firework, LaunchPad, Workflow, ScriptTask
-from firetasks import TrimTask, AlignTask
+from firetasks import TrimTask, AlignTask, SortTask
 import seq_functions
 import argparse
 import os
@@ -14,48 +12,24 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 	workflow_dependencies = collections.defaultdict(list)
 
 	library_dirs = [os.path.join(sequencing_directory, library_prefix + str(i + 1)) for i in xrange(num_libraries)]
-	subdirs = ['unzipped', 'trimmed', 'aligned', 'pythonized', 'sorted']
+	subdirs = ['unzipped', 'trimmed', 'aligned', 'bammed', 'sorted', 'pythonized']
 
 	for library_dir in library_dirs:
 		seq_functions.make_directories(library_dir, subdirs)
 
-		name = "Gunzip_%s" % os.path.basename(library_dir)
-		fw_gunzip = Firework(
+		name = "Sort_%s" % os.path.basename(library_dir)
+		fw_sort = Firework(
 			[
-				ScriptTask(script = "find " + os.path.join(library_dir, raw_data_dir) + " -name '*.gz' -print0 | xargs -0 gunzip"),
-				ScriptTask(script = "mv " + os.path.join(library_dir, raw_data_dir) + "/*.fastq " + os.path.join(library_dir, "unzipped")),
+				SortTask(library_path = library_dir, aligned_name = "aligned", bammed_name = "bammed", sorted_name = "sorted")
 			],
 			name = name,
 			spec = {"_queueadapter": {"job_name": name}},
 			)
-		workflow_fireworks.append(fw_gunzip)
-
-		name = "Trim_%s" % os.path.basename(library_dir)
-		fw_trim = Firework(
-			[
-				TrimTask(library_path = library_dir, unzipped_name = "unzipped", trimmed_name = "trimmed")
-			],
-			name = name,
-			spec = {"_queueadapter": {"job_name": name}},
-			)
-		workflow_fireworks.append(fw_trim)
-		workflow_dependencies[fw_gunzip].append(fw_trim)
-
-		name = "Align_%s" % os.path.basename(library_dir)
-		fw_align = Firework(
-			[
-				AlignTask(library_path = library_dir, trimmed_name = "trimmed", aligned_name = "aligned")
-			],
-			name = name,
-			spec = {"_queueadapter": {"job_name": name}},
-			)
-		workflow_fireworks.append(fw_align)
-		workflow_dependencies[fw_trim].append(fw_align)
+		workflow_fireworks.append(fw_sort)
 
 	lpad.add_wf(
 		Workflow(workflow_fireworks, links_dict = workflow_dependencies)
 		)
-
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
