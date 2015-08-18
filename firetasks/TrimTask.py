@@ -12,7 +12,6 @@ class TrimTask(FireTaskBase):
 	def run_task(self, fw_spec):
 
 		unzip_direc = os.path.join(self["library_path"], self["unzipped_name"])
-
 		file_list = os.listdir(unzip_direc)
 		for seq_file in file_list:
 			sft = seq_file.split('.')[0]

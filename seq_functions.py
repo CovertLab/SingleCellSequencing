@@ -179,21 +179,77 @@ def sort_sam_files(direc_name, aligned_direc = 'aligned', bammed_direc = 'bammed
 	for seq_file in file_list:
 		if fnmatch.fnmatch(seq_file, r'*.sam'):
 			input_file = os.path.join(direc_name, aligned_direc, seq_file)
+
 			seq_file_split = seq_file.split('_')
 			reg_name = seq_file_split[0] + '_' + seq_file_split[1][:-4] + '.bam'
-			sorted_name = seq_file_split[0] + '_' + seq_file_split[1][:-4] + '_sorted'
+			sorted_name_loc = seq_file_split[0] + '_' + seq_file_split[1][:-4] + '_sorted_by_location'
+			sorted_name_name = seq_file_split[0] + '_' + seq_file_split[1][:-4] + '_sorted_by_name'
+
 			output_file = os.path.join(direc_name, bammed_direc, reg_name)
-			sorted_file = os.path.join(direc_name, sorted_direc, sorted_name)
+			sorted_file_loc = os.path.join(direc_name, bammed_direc, sorted_name_loc)
+			sorted_file_name = os.path.join(direc_name, sorted_direc, sorted_name_name)
+
 			cmd = ['samtools', 'view', '-bS', input_file] 
 			print cmd
 			bam_out = run_cmd(cmd)
 			write_file(output_file, bam_out)
-			cmd = ['samtools','sort','-n', output_file, sorted_file]
+
+			#Sort by location and save
+			cmd = ['samtools','sort', output_file, sorted_file_loc]
 			print cmd
 			run_cmd(cmd)
 
-def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = None):
+			#Index the bam file so it can be queried with idx stats
+			cmd = ['samtools','index', sorted_file_loc + '.bam']
+			print cmd
+			run_cmd(cmd)
 
+			#Sort the bam file by name and save
+			cmd = ['samtools','sort', '-n', sorted_file_loc + '.bam', sorted_file_name]
+			print cmd
+			run_cmd(cmd)
+
+def count_bam_files(direc_name, bammed_direc = 'bammed', sorted_direc = 'sorted', counted_direc = 'counted'):
+	bammed_path = os.path.join(direc_name, bammed_direc)
+	sorted_path = os.path.join(direc_name, sorted_direc)
+	counted_path = os.path.join(direc_name, counted_direc)
+	file_list = os.listdir(sorted_path)
+	for bam_file in file_list:
+		if fnmatch.fnmatch(bam_file, r'*.bam'):
+			bfs = bam_file.split('_')
+			bam_file_sorted_by_loc = bfs[0] + '_' + bfs[1] + '_sorted_by_location.bam'
+			num_mapped, num_unmapped = bam_read_count(os.path.join(bammed_path, bam_file_sorted_by_loc))
+
+			coverage, exon_counts, num_mouse_reads, num_spikein_reads = load_sequence_counts(bamfile_name = os.path.join(sorted_path,bam_file))
+		filename_save = bam_file[:-3] + '.npz'
+		print 'Saving ' + filename_save
+		np.savez(filename_save, coverage = coverage, exon_counts = exon_counts, num_mapped = num_mapped, num_unmapped = num_unmapped, num_mouse_reads = num_mouse_reads, num_spikein_reads = num_spikein_reads)
+
+def bam_read_count(bamfile_name = None):
+	# Returns a tuple of the number of mapped and unmapped reads in a bam file
+	
+	cmd = ['samtools', 'idxstats', bamfile_name]
+
+	# To read the output of idxstats line by line, we need to use Popen without communicate()
+	environ = {
+		"PATH": os.environ["PATH"],
+		"LANG": "C",
+		"LC_ALL": "C",
+		}
+	output = subprocess.Popen(cmd, stdout = subprocess.PIPE, env = environ)
+
+	mapped = 0
+	unmapped = 0
+
+	for line in output.stdout:
+		rname, rlen, nm, nu = line.rstrip().split()
+		mapped += int(nm)
+		unmapped += int(nu)
+	print mapped, unmapped
+	return (mapped, unmapped)
+
+def load_sequence_counts(bamfile_name = None, mouse_gtf = '/scratch/PI/mcovert/dvanva/sequencing/reference_sequences/Mus_musculus.GRCm38.81.gtf', spikein_gtf = '/scratch/PI/mcovert/dvanva/sequencing/reference_sequences/spikeInsAM1780.gtf'):
+		
 	"""
 	Load gtf files
 	"""
@@ -204,7 +260,7 @@ def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = No
 	"""
 	Load SAM file
 	"""
-	samfile = HTSeq.BAM_Reader(samfile_name)
+	samfile = HTSeq.BAM_Reader(bamfile_name)
 
 	"""
 	Construct list of genes for the mouse genome and spikeins
@@ -212,11 +268,8 @@ def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = No
 	
 	spikein_transcript_list = []
 	for feature in spikein_gtf_file:
-		print feature
 		if feature.type == 'exon':
 			spikein_transcript_list += [feature.attr['gene_id']]
-
-	print spikein_transcript_list
 
 	mouse_exon_list = []
 	for feature in mouse_gtf_file:
@@ -297,25 +350,25 @@ def load_sequence_counts(samfile_name = None, mouse_gtf = None, spikein_gtf = No
 	""" 
 	Count unmapped reads
 	"""
-	no_unmapped_reads = counts[ '_unmapped' ]
+	num_unmapped_reads = counts[ '_unmapped' ]
 
 	"""
-	Count the reads mapped to the mouse genome
+	Count the reads mapped to the exons in the mouse genome
 	"""
-	no_mouse_reads = 0
+	num_mouse_reads = 0
 
 	for gene_id in mouse_exon_list:
-		no_mouse_reads += counts[ gene_id ]
+		num_mouse_reads += counts[ gene_id ]
 
 	"""
 	Count the reads mapped to the spike ins
 	"""
-	no_spikein_reads = 0
+	num_spikein_reads = 0
 
 	for gene_id in spikein_transcript_list:
-		no_spikein_reads += counts[ gene_id ]
+		num_spikein_reads += counts[ gene_id ]
 
-	return coverage, counts, no_unmapped_reads, no_mouse_reads, no_spikein_reads
+	return coverage, counts, num_mouse_reads, num_spikein_reads
 
 def load_matfiles(input_direc = None):
 	file_list = os.listdir(input_direc)

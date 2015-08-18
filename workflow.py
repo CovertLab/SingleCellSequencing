@@ -51,5 +51,5 @@ Make kallisto index file
 Test sorting sam files
 """
 direc_name =  '/scratch/PI/mcovert/dvanva/seq_test_run/library1'
-seq_functions.sort_sam_files(direc_name)
+seq_functions.count_bam_files(direc_name)
 
