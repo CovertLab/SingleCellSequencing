@@ -11,8 +11,6 @@ import collections
 import datetime
 
 import seq_functions
-from seq_functions import run_cmd, write_file, parse_filename, make_directories, unzip_file, unzip_rawdata, load_matfiles
-from seq_functions import trim_direc, generate_genome_index, run_STAR, load_sequence_counts, run_kallisto_test
 
 """
 Define directories
@@ -50,6 +48,10 @@ Make kallisto index file
 """
 Test sorting sam files
 """
-direc_name =  '/scratch/PI/mcovert/dvanva/seq_test_run/library1'
-seq_functions.count_bam_files(direc_name)
+# direc_name =  '/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna/Mus_musculus.GRCm38.81.gtf'
+# seq_functions.load_ensembl_gene_ids(direc_name)
 
+file_name = '/scratch/PI/mcovert/dvanva/seq_test_run/library1/'
+
+transcripts, spikes = seq_functions.count_hdf5_files(file_name, spikeids = ['Spike1', 'Spike4', 'Spike7'])
+print spikes

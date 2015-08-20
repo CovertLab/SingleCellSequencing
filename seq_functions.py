@@ -15,10 +15,27 @@ import shlex
 import numpy
 import scipy
 import scipy.io as sio 
+import pyensembl
+import h5py
+import pandas as pd
+import numpy as np
+
+
+"""
+Command for installing the mouse genome into pyensembl
+pyensembl install --reference-name "GRCm38" --gtf-path-or-url ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz --transcript-fasta-path-or-url ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz --protein-fasta-path-or-url ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz
+
+Load the genome using the command:
+
+data = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
+
+"""
 
 """
 Define functions
 """
+def relu(x):
+	return x*(x>0)
 
 def run_cmd(cmd):
 	environ = {
@@ -168,12 +185,6 @@ def run_kallisto_test():
 	input_filename = '1-10_S14'
 	run_kallisto_quant(direc_name, input_filename)
 
-	# cmd = 'kallisto quant -i /scratch/PI/mcovert/dvanva/sequencing/reference_sequences/mus_musculus_index -o /scratch/PI/mcovert/dvanva/sequencing/library1 --pseudobam /scratch/PI/mcovert/dvanva/sequencing/library1/trimmed/1-10_S14_R1_trimmed.fq /scratch/PI/mcovert/dvanva/sequencing/library1/trimmed/1-10_S14_R2_trimmed.fq'
-	# cmd_temp = shlex.split(cmd)
-	# print cmd_temp
-	# kal_out = run_cmd(cmd_temp)
-	# write_file('/scratch/PI/mcovert/dvanva/sequencing/kal_out.sam', kal_out)
-
 def sort_sam_files(direc_name, aligned_direc = 'aligned', bammed_direc = 'bammed', sorted_direc = 'sorted'):
 	file_list = os.listdir(os.path.join(direc_name,aligned_direc))
 	for seq_file in file_list:
@@ -209,27 +220,40 @@ def sort_sam_files(direc_name, aligned_direc = 'aligned', bammed_direc = 'bammed
 			print cmd
 			run_cmd(cmd)
 
-def count_bam_files(direc_name, bammed_direc = 'bammed', sorted_direc = 'sorted', counted_direc = 'counted'):
+def count_hdf5_files(direc_name, bammed_direc = 'bammed', aligned_direc = 'aligned', counted_direc = 'counted', spikeids = []):
 	bammed_path = os.path.join(direc_name, bammed_direc)
-	sorted_path = os.path.join(direc_name, sorted_direc)
+	aligned_path = os.path.join(direc_name, aligned_direc)
 	counted_path = os.path.join(direc_name, counted_direc)
-	file_list = os.listdir(sorted_path)
-	for bam_file in file_list:
-		if fnmatch.fnmatch(bam_file, r'*.bam'):
-			bfs = bam_file.split('_')
-			bam_file_sorted_by_loc = bfs[0] + '_' + bfs[1] + '_sorted_by_location.bam'
+	
+	file_list = os.listdir(aligned_path)
+	for seq_file in file_list:
+		print seq_file, fnmatch.fnmatch(seq_file, r'*.h5')
+		if fnmatch.fnmatch(seq_file, r'*.h5'):
+			bfs = seq_file.split('.')
+			bam_file_sorted_by_loc = bfs[0] + '_sorted_by_location.bam'
 			num_mapped, num_unmapped = bam_read_count(os.path.join(bammed_path, bam_file_sorted_by_loc))
+			transcripts, spikeins = load_sequence_counts_kallisto(h5file_name = os.path.join(aligned_path,seq_file), spikeids = spikeids)
 
-			coverage, exon_counts, num_mouse_reads, num_spikein_reads = load_sequence_counts(bamfile_name = os.path.join(sorted_path,bam_file))
-		filename_save = bam_file[:-3] + '.npz'
-		print 'Saving ' + filename_save
-		np.savez(filename_save, coverage = coverage, exon_counts = exon_counts, num_mapped = num_mapped, num_unmapped = num_unmapped, num_mouse_reads = num_mouse_reads, num_spikein_reads = num_spikein_reads)
+			filename_save = os.path.join(counted_path, seq_file[:-3] + '.h5')
+			print 'Saving ' + filename_save
+			
+			store = pd.HDFStore(filename_save)
+
+			d = {'num_mapped': num_mapped, 'num_unmapped': num_unmapped}
+			quality_control = pd.DataFrame(d, index = [0])
+
+			store['quality_control'] = quality_control 
+			store['transcripts'] = transcripts
+			store['spikeins'] = spikeins
+			store.close()
+
+			# np.savez(filename_save, num_mapped = num_mapped, num_unmapped = num_unmapped, transcripts = transcripts, spikeins = spikeins)
 
 def bam_read_count(bamfile_name = None):
 	# Returns a tuple of the number of mapped and unmapped reads in a bam file
 	
 	cmd = ['samtools', 'idxstats', bamfile_name]
-
+	print cmd
 	# To read the output of idxstats line by line, we need to use Popen without communicate()
 	environ = {
 		"PATH": os.environ["PATH"],
@@ -243,12 +267,107 @@ def bam_read_count(bamfile_name = None):
 
 	for line in output.stdout:
 		rname, rlen, nm, nu = line.rstrip().split()
-		mapped += int(nm)
-		unmapped += int(nu)
+		mapped += relu(int(nm) - int(nu))
+		if nm > 0:
+			unmapped += 2* int(nu)
+		else:
+			unmapped += int(nu)
 	print mapped, unmapped
 	return (mapped, unmapped)
 
-def load_sequence_counts(bamfile_name = None, mouse_gtf = '/scratch/PI/mcovert/dvanva/sequencing/reference_sequences/Mus_musculus.GRCm38.81.gtf', spikein_gtf = '/scratch/PI/mcovert/dvanva/sequencing/reference_sequences/spikeInsAM1780.gtf'):
+def load_ensembl_gene_ids(mouse_gtf = None):
+	data = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
+	return data
+
+def load_sequence_counts_kallisto(h5file_name = None, spikeids = []):
+	"""
+	To make: dictionary with counts, addressable by gene id name
+	dictionary with bootstrap errors, addressable by gene id name
+	First load HDF file
+	Create dictionary 
+	"""
+
+	# Load mouse genome with pyensembl
+	# mouse_genome = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
+
+	seq_file = h5py.File(h5file_name, 'r')
+	class Kdata(object):
+		def __init__(self,f):
+			self.kversion = ''
+			self.idxversion = 0
+			self.num_bootstraps = 0
+			self.start_time = ''
+			self.call = ''
+
+			num_targets = len(f['aux']['ids'])
+			self.ids = np.array(f['aux']['ids'])
+
+			# self.gene_names = np.zeros(len(self.ids), dtype = str)
+			# for i in xrange(len(self.ids)):
+			# 	print i
+			# 	if self.ids[i] not in spikeids:
+			# 		self.gene_names[i] = mouse_genome.gene_name_of_transcript_id(self.ids[i])
+			
+			self.lengths = np.array(f['aux']['lengths'])
+			self.eff_lengths = np.array(f['aux']['eff_lengths'])
+
+			return None
+
+	def get_aux_data(f):
+		kdata = Kdata(f)
+		kdata.kversion = f['aux']['kallisto_version'][0]
+		kdata.idxversion = f['aux']['index_version'][0]
+		kdata.num_targets = len(f['aux']['ids'])
+		kdata.num_bootstrap = f['aux']['num_bootstrap'][0]
+		kdata.start_time = f['aux']['start_time'][0]
+		kdata.call = f['aux']['call'][0]
+		return kdata
+
+	bs_col_list = []
+	kdata = get_aux_data(seq_file)
+
+	d = {'target_id': kdata.ids, 'length': kdata.lengths, 'eff_length': kdata.eff_lengths}
+	data_frame = pd.DataFrame(d)
+	est_counts = pd.Series(seq_file['est_counts'], index = data_frame.index)
+	data_frame['est_counts'] = est_counts
+
+	if kdata.num_bootstrap > 0:
+		# Add the boot strap count estimates as columns
+		for i in xrange(kdata.num_bootstrap):
+			bs_key = 'b' + str(i)
+			bs_col_list.append(bs_key)
+			bs_counts = pd.Series(f['bootstrap']['bs_key'], index = data_frame.index)
+			data_frame[bs_key] = bs_counts
+
+		# Compute statistics
+		data_frame['est_counts_mean'] = data_frame[bs_col_list].mean(axis = 1)
+		data_frame['est_counts_stdev'] = data_frame[bs_col_list].std(axis = 1)
+		data_frame['est_counts_sem'] = data_frame[bs_col_list].sem(axis = 1)
+		data_frame['est_counts_min'] = data_frame[bs_col_list].min(axis = 1)
+		data_frame['est_counts_med'] = data_frame[bs_col_list].median(axis = 1)
+		data_frame['est_counts_max'] = data_frame[bs_col_list].max(axis = 1)
+
+	spike_ins = data_frame[data_frame['target_id'].isin(spikeids)]
+	spike_locs = []
+	for spikeid in spikeids:
+		spike_locs += np.where(kdata.ids == spikeid)
+	transcript_ids_only = np.delete(kdata.ids,spike_locs)
+	transcripts = data_frame[data_frame['target_id'].isin(transcript_ids_only)]
+
+	# Compute TPM
+	if kdata.num_bootstrap == 0:
+		divisor = (transcripts.est_counts / transcripts.eff_length).sum()
+		transcripts['tpm'] = ( (transcripts.est_counts / transcripts.eff_length) / divisor) * 1e6
+	else:
+		divisor = (transcripts.est_counts_mean / transcripts.eff_length).sum()
+		transcripts['tpm'] = ( (transcripts.est_counts_mean / transcripts.eff_length) / divisor) * 1e6
+
+	transcripts.set_index('target_id', inplace = True)
+	spike_ins.set_index('target_id', inplace = True)
+
+	return transcripts, spike_ins
+
+def load_sequence_counts_STAR(bamfile_name = None, mouse_gtf = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq_cdna/Mus_musculus.GRCm38.81.gtf', spikein_gtf = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq/spikeInsAM1780.gtf'):
 		
 	"""
 	Load gtf files
@@ -373,11 +492,17 @@ def load_sequence_counts(bamfile_name = None, mouse_gtf = '/scratch/PI/mcovert/d
 def load_matfiles(input_direc = None):
 	file_list = os.listdir(input_direc)
 	matfiles = []
-	for matfile in file_list:
+	var_list = ['All300minsdata', 'All150minsNoStimulationdata', 'All150minsdata','All75minsdata','All0minsdata'] 
+	for it in xrange(len(file_list)):
+		matfile = file_list[it]
 		if fnmatch.fnmatch(matfile, r'*.mat'):
 			time = int(matfile.split('_')[0])
-			dynamics_file = sio.loadmat(input_direc + matfile)
-			matfiles += [[dynamics_file, time]]
+			dynamics_file = sio.loadmat(os.path.join(input_direc,matfile))
+			if var_list[it] == 'All150minsNoStimulationdata':
+				condition = 'NoStim'
+			else:
+				condition = 'Stim'
+			matfiles += [[dynamics_file[var_list[it]], time, condition]]
 	return matfiles
 
 class dynamics_class():
@@ -387,14 +512,16 @@ class dynamics_class():
 		capture_site_dict = {} 
 		num_of_cells_in_well_dict = {}
 		time_point_dict = {}
+		condition_dict = {}
 		for matfile in matfiles:
 			for row in xrange(matfile[0].shape[0]):
-				library_id = matfile[0][row, 1]
-				cell_id = matfile[0][row, 2]
+				library_id = int(matfile[0][row, 1])
+				cell_id = int(matfile[0][row, 2])
 
 				dict_loc = str(library_id) + '-' + str(cell_id)
 
 				dynamics_dict[dict_loc] = matfile[0][row, 5:]
+				condition_dict[dict_loc] = matfile[2]
 				chip_no_dict[dict_loc] = matfile[0][row, 0]
 				capture_site_dict[dict_loc] = matfile[0][row, 3]
 				num_of_cells_in_well_dict[dict_loc] = matfile[0][row, 4]
@@ -405,18 +532,26 @@ class dynamics_class():
 		self.capture_site_dict = capture_site_dict
 		self.num_of_cells_in_well_dict = num_of_cells_in_well_dict
 		self.time_point_dict = time_point_dict
+		self.condition_dict = condition_dict
 
 class cell_object():
-	def __init__(self, direc = None, samfile_name = None, dictionary = None, mouse_gtf_loc = None, spikein_gtf_loc = None):
-		cell_id = parse_filename(samfile_name)
+	def __init__(self, h5_file = None, dictionary = None):
+		cell_id = parse_filename(os.path.basename(h5_file))
 		self.NFkB_dynamics = dictionary.dynamics_dict[cell_id]
 		self.chip_number = dictionary.chip_no_dict[cell_id]
 		self.capture_site = dictionary.capture_site_dict[cell_id]
-		self.time_point = time_point_dict[cell_id]
-		self.number_of_cells = num_of_cells_in_well_dict[cell_id]
+		self.time_point = dictionary.time_point_dict[cell_id]
+		self.number_of_cells = dictionary.num_of_cells_in_well_dict[cell_id]
+		self.condition = dictionary.condition_dict[cell_id]
+		self.clusterID = 0
+		self.quality = 0
 
-		coverage, counts, num_unmapped_reads, num_mouse_reads, num_spikein_reads = load_sequence_counts(samfile_name = None, mouse_gtf = mouse_gtf_loc, spikein_gtf = spikein_gtf_loc)
-		self.coverage = coverage
-		self.counts = counts
-		self.num_unmapped_reads = num_unmapped_reads
-		self.num_spikein_reads = num_spikein_reads
+		seq_data = pd.HDFStore(h5_file)
+		self.num_mapped = seq_data['quality_control']['num_mapped']
+		self.num_unmapped = seq_data['quality_control']['num_unmapped']
+		self.transcripts = seq_data['transcripts']
+		self.spikeins = seq_data['spikeins']
+		self.total_estimated_counts = self.transcripts.est_counts.sum() + self.spikeins.est_counts.sum()
+		seq_data.close()
+
+
