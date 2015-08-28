@@ -110,6 +110,10 @@ def trim_direc(direc_name):
 		print seq_file_name
 		trim_reads(direc_name, seq_file_name)
 
+def count_reads(file_name):
+	cmd = ['wc', 'l', file_name]
+	counts = int(run_cmd(cmd).split()[0])
+
 def generate_genome_index():
 	option_name = []
 	option = []
@@ -513,6 +517,8 @@ class dynamics_class():
 		num_of_cells_in_well_dict = {}
 		time_point_dict = {}
 		condition_dict = {}
+		library_number_dict = {}
+		cell_number_dict = {}
 		for matfile in matfiles:
 			for row in xrange(matfile[0].shape[0]):
 				library_id = int(matfile[0][row, 1])
@@ -526,7 +532,11 @@ class dynamics_class():
 				capture_site_dict[dict_loc] = matfile[0][row, 3]
 				num_of_cells_in_well_dict[dict_loc] = matfile[0][row, 4]
 				time_point_dict[dict_loc] = matfile[1]
+				cell_number_dict[dict_loc] = cell_id
+				library_number_dict[dict_loc] = library_id
 
+		self.library_number_dict = library_number_dict
+		self.cell_number_dict = cell_number_dict
 		self.dynamics_dict = dynamics_dict
 		self.chip_no_dict = chip_no_dict
 		self.capture_site_dict = capture_site_dict
@@ -536,8 +546,13 @@ class dynamics_class():
 
 class cell_object():
 	def __init__(self, h5_file = None, dictionary = None):
+
 		cell_id = parse_filename(os.path.basename(h5_file))
-		self.NFkB_dynamics = dictionary.dynamics_dict[cell_id]
+
+		# Load experimental metadata
+		self.id = cell_id
+		self.library_number = dictionary.library_number_dict[cell_id]
+		self.cell_number = dictionary.cell_number_dict[cell_id]
 		self.chip_number = dictionary.chip_no_dict[cell_id]
 		self.capture_site = dictionary.capture_site_dict[cell_id]
 		self.time_point = dictionary.time_point_dict[cell_id]
@@ -546,6 +561,10 @@ class cell_object():
 		self.clusterID = 0
 		self.quality = 0
 
+		# Load signaling dynamics
+		self.NFkB_dynamics = dictionary.dynamics_dict[cell_id]
+
+		# Load transcriptome
 		seq_data = pd.HDFStore(h5_file)
 		self.num_mapped = seq_data['quality_control']['num_mapped']
 		self.num_unmapped = seq_data['quality_control']['num_unmapped']

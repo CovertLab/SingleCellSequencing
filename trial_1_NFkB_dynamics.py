@@ -51,7 +51,7 @@ for cell in all_cells:
 	ax.plot(cell.NFkB_dynamics, label = 'Cell' + str(cell_counter))
 	ax.set_xlabel('Time (timepoints)')
 	ax.set_ylabel('Normalized fluorescence (au)')
-	ax.set_title('Nuclear concentration of NFkB')
+	ax.set_title('NFkB dynamics for 20 different cells')
 	cell_counter += 1
 
 

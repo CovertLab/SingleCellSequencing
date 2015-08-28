@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from fireworks import Firework, LaunchPad, Workflow, ScriptTask
-from firetasks import TrimTask, AlignTask
+from firetasks import TrimTask, AlignTask, SortTask, CountTask
 import seq_functions
 import argparse
 import os
@@ -51,6 +51,29 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 			)
 		workflow_fireworks.append(fw_align)
 		workflow_dependencies[fw_trim].append(fw_align)
+
+		name = "Sort_%s" % os.path.basename(library_dir)
+		fw_sort = Firework(
+			[
+				SortTask(library_path = library_dir, aligned_name = "aligned", bammed_name = "bammed", sorted_name = "sorted")
+			],
+			name = name,
+			spec = {"_queueadapter": {"job_name": name}},
+			)
+		workflow_fireworks.append(fw_sort)
+		workflow_dependencies[fw_align].append(fw_sort)
+
+
+		name = "Count_%s" % os.path.basename(library_dir)
+		fw_count = Firework(
+			[
+				CountTask(library_path = library_dir, aligned_name = "aligned", bammed_name = "bammed", counted_name = "counted")
+			],
+			name = name,
+			spec = {"_queueadapter": {"job_name": name}},
+			)
+		workflow_fireworks.append(fw_count)
+		workflow_dependencies[fw_sort].append(fw_count)
 
 	lpad.add_wf(
 		Workflow(workflow_fireworks, links_dict = workflow_dependencies)

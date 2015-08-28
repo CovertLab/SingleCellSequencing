@@ -50,13 +50,10 @@ for cell in all_cells:
 mapped = np.array(mapped_list)/2
 unmapped = np.array(unmapped_list)/2
 
-print np.mean(mapped) 
-print np.mean(unmapped)
-
 mp = plt.hist(mapped, bins = 40, label = 'Mapped reads')
 unmp = plt.hist(unmapped, bins = 40, label = 'Unmapped reads')
 plt.xlabel('Number of reads')
 plt.ylabel('Number of cells')
 plt.title('Number of reads mapping to the transcriptome')
 plt.legend()
-plt.savefig("qc1_num_mapped_histogram.pdf")
+plt.savefig("qc1_num_mapped_histogram.png")
