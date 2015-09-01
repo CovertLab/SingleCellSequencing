@@ -19,6 +19,11 @@ import pyensembl
 import h5py
 import pandas as pd
 import numpy as np
+import scipy.cluster.hierarchy as sch
+import rpy2
+import rpy2.robjects.numpy2ri
+from rpy2.robjects.packages import importr
+rpy2.robjects.numpy2ri.activate()
 
 
 """
@@ -371,128 +376,6 @@ def load_sequence_counts_kallisto(h5file_name = None, spikeids = []):
 
 	return transcripts, spike_ins
 
-def load_sequence_counts_STAR(bamfile_name = None, mouse_gtf = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq_cdna/Mus_musculus.GRCm38.81.gtf', spikein_gtf = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq/spikeInsAM1780.gtf'):
-		
-	"""
-	Load gtf files
-	"""
-
-	mouse_gtf_file = HTSeq.GFF_Reader(mouse_gtf)
-	spikein_gtf_file = HTSeq.GFF_Reader(spikein_gtf)
-
-	"""
-	Load SAM file
-	"""
-	samfile = HTSeq.BAM_Reader(bamfile_name)
-
-	"""
-	Construct list of genes for the mouse genome and spikeins
-	"""
-	
-	spikein_transcript_list = []
-	for feature in spikein_gtf_file:
-		if feature.type == 'exon':
-			spikein_transcript_list += [feature.attr['gene_id']]
-
-	mouse_exon_list = []
-	for feature in mouse_gtf_file:
-		if feature.type == 'exon':
-			mouse_exon_list += [feature.attr['gene_id']]
-
-
-	"""
-	Construct genomic array for exons and spikeins
-	"""
-	exons = HTSeq.GenomicArrayOfSets('auto', stranded = False)
-	spikeins = HTSeq.GenomicArrayOfSets('auto', stranded = False)
-
-	for feature in mouse_gtf_file:
-		if feature.type == 'exon':
-			exons[ feature.iv ] += feature.attr['gene_id']
-
-	for feature in spikein_gtf_file:
-		if feature.type == 'exon':
-			spikeins[ feature.iv ] += feature.attr['gene_id']
-
-	"""
-	Compute coverage map
-	"""
-	coverage = HTSeq.GenomicArray('auto', stranded = False)
-	for bundle in HTSeq.pair_SAM_alignments(samfile, bundle = True):
-		# Skip multiple alignments
-		if len(bundle) != 1:
-			continue 
-		left_read, right_read = bundle[0]
-		if left_read.aligned:
-			coverage[ left_read.iv ] += 1
-		if right_read.aligned:
-			coverage[ right_read.iv] += 1
-
-	"""
-	Count paired-end reads
-	"""
-
-	alignment_file = HTSeq.SAM_Reader('')
-	counts = collections.Counter()
-	for bundle in HTSeq.pair_SAM_alignments(samfile, bundle = True):
-		# Skip multiple alignments
-		if len(bundle) != 1:
-			continue 
-		left_read, right_read = bundle[0]
-
-		# Check to make sure the paired reads actually aligned
-		if not left_read.aligned and right_read.aligned:
-			count[ '_unmapped' ] += 1
-			continue
-		gene_ids = set()
-
-		# Check to see if the paired reads map to the mouse genome
-		for iv, val in exons[ left_read.iv ].steps():
-			gene_ids |= val
-
-		for iv, val in exons[ right_read.iv ].steps():
-			gene_ids |= val
-
-		# Check to see if the paired reads map to the spike ins 
-		for iv, val in spikeins[ left_read.iv ].steps():
-			gene_ids |= val
-
-		for iv, val in spikeins[ right_read.iv ].steps():
-			gene_ids |= val
-
-		if len(gene_ids) == 1:
-			gene_id = list(gene_ids)[0]
-			counts[ gene_id ] += 1
-
-		elif len(gene_ids) == 0:
-			counts[ '_no_feature' ] += 1
-
-		else:
-			counts[ '_ambiguous' ] += 1 
-
-	""" 
-	Count unmapped reads
-	"""
-	num_unmapped_reads = counts[ '_unmapped' ]
-
-	"""
-	Count the reads mapped to the exons in the mouse genome
-	"""
-	num_mouse_reads = 0
-
-	for gene_id in mouse_exon_list:
-		num_mouse_reads += counts[ gene_id ]
-
-	"""
-	Count the reads mapped to the spike ins
-	"""
-	num_spikein_reads = 0
-
-	for gene_id in spikein_transcript_list:
-		num_spikein_reads += counts[ gene_id ]
-
-	return coverage, counts, num_mouse_reads, num_spikein_reads
-
 def load_matfiles(input_direc = None):
 	file_list = os.listdir(input_direc)
 	matfiles = []
@@ -508,6 +391,72 @@ def load_matfiles(input_direc = None):
 				condition = 'Stim'
 			matfiles += [[dynamics_file[var_list[it]], time, condition]]
 	return matfiles
+
+def quality_control(list_of_cells, min_num_of_reads = 200000, max_fraction_spikein = 0.3, max_fraction_unmapped = 0.5):
+	for cell in list_of_cells:
+		cell.quality = 1
+
+		# Screen the number of mapped reads
+		if cell.num_mapped < min_num_of_reads:
+			cell.quality = 0
+
+		# Screen the fraction of reads that map to spike ins
+		spikein_counts = cell.spikeins.loc['Spike1']['est_counts'] + cell.spikeins.loc['Spike4']['est_counts'] + cell.spikeins.loc['Spike7']['est_counts']
+		if spikein_counts/cell.total_estimated_counts > max_fraction_spikein:
+			cell.quality = 0
+
+		# Remove cells where 50% or more of the reads were unmapped
+		if cell.num_unmapped/cell.num_mapped > max_fraction_unmapped:
+			cell.quality = 0
+
+	new_list_of_cells = []
+	for cell in list_of_cells:
+		if cell.quality == 1:
+			new_list_of_cells += [cell]
+
+	return new_list_of_cells
+
+def cell_cluster(list_of_cells, max_clusters = 3):
+	R = rpy2.robjects.r
+	DTW = importr('dtw')
+	longest_time = 0
+	number_of_cells = 0
+	for cell in list_of_cells:
+		number_of_cells += 1
+		longest_time = np.amax([longest_time, cell.NFkB_dynamics.shape[0]])
+
+	dynamics_matrix = np.zeros((number_of_cells,longest_time))
+
+	"""
+	Fill up the heat map matrix
+	"""
+
+	cell_counter = 0
+	for j in xrange(number_of_cells):
+		cell = list_of_cells[j]		
+		dynam = cell.NFkB_dynamics
+		dynamics_matrix[cell_counter,0:dynam.shape[0]] = dynam
+		cell_counter += 1
+
+	"""
+	Perform hierarchical clustering
+	"""
+
+	distance_matrix = np.zeros((number_of_cells, number_of_cells))
+	for i in xrange(number_of_cells):
+		for j in xrange(number_of_cells):
+			alignment = R.dtw(dynamics_matrix[i,:], dynamics_matrix[j,:], keep = True)
+			distance_matrix[i,j] = alignment.rx('distance')[0][0]
+
+	Y = sch.linkage(distance_matrix, method = 'centroid')
+
+	clusters = sch.fcluster(Y, max_clusters, criterion = 'maxclust')
+
+	for j in xrange(number_of_cells):
+		list_of_cells[j].clusterID = clusters[j]
+
+	return list_of_cells
+
 
 class dynamics_class():
 	def __init__(self, matfiles):
@@ -566,8 +515,8 @@ class cell_object():
 
 		# Load transcriptome
 		seq_data = pd.HDFStore(h5_file)
-		self.num_mapped = seq_data['quality_control']['num_mapped']
-		self.num_unmapped = seq_data['quality_control']['num_unmapped']
+		self.num_mapped = seq_data['quality_control']['num_mapped'].item()/2
+		self.num_unmapped = seq_data['quality_control']['num_unmapped'].item()/2
 		self.transcripts = seq_data['transcripts']
 		self.spikeins = seq_data['spikeins']
 		self.total_estimated_counts = self.transcripts.est_counts.sum() + self.spikeins.est_counts.sum()

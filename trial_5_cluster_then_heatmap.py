@@ -29,10 +29,15 @@ import matplotlib
 import cPickle as pickle
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import scipy.cluster.hierarchy as sch
+import rpy2
+import rpy2.robjects.numpy2ri
+from rpy2.robjects.packages import importr
+rpy2.robjects.numpy2ri.activate()
 
 # matplotlib.style.use('ggplot')
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
-all_cell_file = 'all_cells.pkl'
+all_cell_file = 'all_cells_qc.pkl'
 all_cells = pickle.load(open(os.path.join(direc,all_cell_file)))
 
 def cleanAxis(ax):
@@ -52,40 +57,75 @@ def cleanAxis(ax):
 Figure out the length of the longest time trace
 """
 
-longest_time = 0
-number_of_cells = 0
-t = 75
 
-for cell in all_cells:
-	if cell.time_point == t:
-		number_of_cells += 1
-		longest_time = np.amax([longest_time, cell.NFkB_dynamics.shape[0]])
+times = [75, 150, 300]
 
-heat_map = np.zeros((number_of_cells,longest_time))
+R = rpy2.robjects.r
+DTW = importr('dtw')
 
-"""
-Fill up the heat map matrix
-"""
+for t in times:
 
-cell_counter = 0
-for cell in all_cells:
-	if cell.time_point == t:
-		number_of_cells += 1
-		dynam = cell.NFkB_dynamics
-		heat_map[cell_counter,0:dynam.shape[0]] = dynam
-		cell_counter += 1
+	longest_time = 0
+	number_of_cells = 0
+	for cell in all_cells:
+		if cell.time_point == t:
+			number_of_cells += 1
+			longest_time = np.amax([longest_time, cell.NFkB_dynamics.shape[0]])
 
-fig = plt.figure(figsize = (6,8))
-ax = fig.add_subplot(111)
-cleanAxis(ax)
+	dynamics_matrix = np.zeros((number_of_cells,longest_time))
 
-cax = ax.imshow(heat_map, cmap = plt.get_cmap('Reds'), interpolation = 'none')
-ax.set_xlabel('Time')
-ax.set_ylabel('Cells')
-ax.set_title('75 minute NFkB activity heatmap - ' + str(number_of_cells) + ' cells', y = 1.05)
-fig.colorbar(cax, ticks = [0, 1], orientation = 'vertical')
+	"""
+	Fill up the heat map matrix
+	"""
 
-plt.savefig("trial_3_dynamics_heatmap_75min.pdf")
+	cell_counter = 0
+	for cell in all_cells:
+		if cell.time_point == t:
+			dynam = cell.NFkB_dynamics
+			dynamics_matrix[cell_counter,0:dynam.shape[0]] = dynam
+			cell_counter += 1
+
+	"""
+	Perform hierarchical clustering
+	"""
+
+	distance_matrix = np.zeros((number_of_cells, number_of_cells))
+	for i in xrange(number_of_cells):
+		for j in xrange(number_of_cells):
+			print i, j
+			# distance_matrix[i,j] = np.linalg.norm(dynamics_matrix[i,:] - dynamics_matrix[j,:])
+			alignment = R.dtw(dynamics_matrix[i,:], dynamics_matrix[j,:], keep = True)
+			distance_matrix[i,j] = alignment.rx('distance')[0][0]
+
+	Y = sch.linkage(distance_matrix, method = 'centroid')
+
+	"""
+	Plot dendrogram
+	"""
+
+	fig = plt.figure()
+	ax_dendro = fig.add_axes([0.09, 0.1, 0.2, 0.8], frame_on = False)
+	Z = sch.dendrogram(Y, orientation = 'right')
+
+	ax_dendro.set_xticks([])
+	ax_dendro.set_yticks([])
+
+	"""
+	Plot heatmap
+	"""
+
+	ax_heatmap = fig.add_axes([0.3, 0.1, 0.6, 0.8])
+	index = Z['leaves']
+	dynamics_ordered = dynamics_matrix[index,:]
+	im = ax_heatmap.matshow(dynamics_ordered, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('Reds'), interpolation = 'none')
+	fig.colorbar(im, ticks = [0, 1], orientation = 'vertical')
+
+	ax_heatmap.set_title(str(t) +' minute NFkB activity heatmap - ' + str(number_of_cells) + ' cells', y = 1.05)
+	ax_heatmap.set_xlabel('Time')
+	ax_heatmap.set_yticks([])
+	ax_heatmap.set_xticks([])
+
+	plt.savefig("plots/trial_5_dynamics_clustering_" + str(t) + "min.pdf")
 
 
 
