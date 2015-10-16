@@ -49,21 +49,44 @@ Load mouse genome
 """
 
 mouse_genome = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
-gene_names = pyensembl.gene_names
+transcript_names = all_cells[0].transcripts.index
+gene_names = []
+for transcript in transcript_names:
+	gene_names += [mouse_genome.gene_name_of_transcript_id(transcript)]
+
+unique_gene_names = list(set(gene_names))
 
 transcript_dict = {}
+for gene in unique_gene_names:
+	transcript_dict[gene] = []
 
-for gene in gene_names:
-	transcript_dict[gene] = transcript_ids_of_gene_name(gene)
+for transcript in transcript_names:
+	gene_name = mouse_genome.gene_name_of_transcript_id(transcript)
+	transcript_dict[gene_name] += [transcript]
+
+
+# print 'gene names ', len(gene_names)
+# print 'transcript names ', len(transcript_names)
+# print transcript_dict
 
 for cell in all_cells:
-	counts_dict = {}
-	tpm_dict = {}
-	for gene in gene_names:
-		transcript_names = transcript_dict[gene]
+	print cell.id
+	counts_list = []
+	tpm_list = []
+	for j in xrange(len(gene_names)):
+		gene = gene_names[j]
+		transcripts = transcript_dict[gene]
 		counts = 0
 		tpm = 0
-		for transcript_name in transcript_names:
-			counts += cell.transcripts.loc[transcript_name]['est_counts']
-			counts += cell.transcripts.loc[transcript_name]['tpm']
+		for transcript in transcripts:
+			# print transcript
+			counts += cell.transcripts.loc[transcript]['est_counts']
+			tpm += cell.transcripts.loc[transcript]['tpm']
+		counts_list += [counts]
+		tpm_list += [tpm]
+
+	d = {'gene_name': gene_names, 'est_counts': counts_list, 'tpm': tpm }
+	cell.gene_counts = pd.DataFrame(d)
+	cell.gene_counts.set_index('gene_name', inplace = True)
+
 

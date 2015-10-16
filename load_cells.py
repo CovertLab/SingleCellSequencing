@@ -43,7 +43,8 @@ for library in librarys_to_load:
 			cell = seq_functions.cell_object(h5_file = os.path.join(lib_path, h5_file), dictionary = dynamics_data)
 			all_cells += [cell]
 
-file_name_save = os.path.join(direc, 'all_cells.pkl')
+all_cells_qc = seq_functions.quality_control(all_cells)
 
-pickle.dump(all_cells, open(file_name_save, 'wb'), protocol = pickle.HIGHEST_PROTOCOL)
+file_name_save = os.path.join(direc, 'all_cells_qc.pkl')
+pickle.dump(all_cells_qc, open(file_name_save, 'wb'), protocol = pickle.HIGHEST_PROTOCOL)
 

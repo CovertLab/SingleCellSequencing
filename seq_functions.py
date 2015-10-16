@@ -235,6 +235,31 @@ def count_hdf5_files(direc_name, bammed_direc = 'bammed', aligned_direc = 'align
 	counted_path = os.path.join(direc_name, counted_direc)
 	
 	file_list = os.listdir(aligned_path)
+
+	mouse_genome = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
+	
+	for seq_file_temp in file_list:
+		if fnmatch.fnmatch(seq_file_temp, r'*.h5'):
+			seq_file = seq_file_temp
+	transcripts, spikeins = load_sequence_counts_kallisto(h5file_name = os.path.join(aligned_path,seq_file), spikeids = spikeids)
+
+	transcript_names = transcripts.index
+	gene_names = []
+	counter = 0
+	for transcript in transcript_names:
+		counter += 1
+		print counter
+		gene_names += [mouse_genome.gene_name_of_transcript_id(transcript)]
+	unique_gene_names = list(set(gene_names))
+
+	transcript_dict = {}
+	for gene in unique_gene_names:
+		transcript_dict[gene] = []
+
+	for transcript in transcript_names:
+		gene_name = mouse_genome.gene_name_of_transcript_id(transcript)
+		transcript_dict[gene_name] += [transcript]
+
 	for seq_file in file_list:
 		print seq_file, fnmatch.fnmatch(seq_file, r'*.h5')
 		if fnmatch.fnmatch(seq_file, r'*.h5'):
@@ -251,12 +276,34 @@ def count_hdf5_files(direc_name, bammed_direc = 'bammed', aligned_direc = 'align
 			d = {'num_mapped': num_mapped, 'num_unmapped': num_unmapped}
 			quality_control = pd.DataFrame(d, index = [0])
 
+			# Create a transcript table indexed by gene name
+			counts_list = []
+			fpkm_list = []
+			tpm_list = []
+			for j in xrange(len(unique_gene_names)):
+				gene = unique_gene_names[j]
+				transcript_list = transcript_dict[gene]
+				counts = 0
+				fpkm = 0
+				tpm = 0
+				for transcript in transcript_list:
+					counts += transcripts.loc[transcript]['est_counts']
+					fpkm += transcripts.loc[transcript]['fpkm']
+					tpm += transcripts.loc[transcript]['tpm']
+				counts_list += [counts]
+				fpkm_list += [fpkm]
+				tpm_list += [tpm]
+
+			d = {'gene_name': unique_gene_names, 'est_counts': counts_list, 'fpkm': fpkm_list, 'tpm': tpm_list}
+			gene_counts = pd.DataFrame(d)
+			gene_counts.set_index('gene_name', inplace = True)
+
+			# Store data frames in HDF5 format
 			store['quality_control'] = quality_control 
 			store['transcripts'] = transcripts
+			store['gene_counts'] = gene_counts
 			store['spikeins'] = spikeins
 			store.close()
-
-			# np.savez(filename_save, num_mapped = num_mapped, num_unmapped = num_unmapped, transcripts = transcripts, spikeins = spikeins)
 
 def bam_read_count(bamfile_name = None):
 	# Returns a tuple of the number of mapped and unmapped reads in a bam file
@@ -310,13 +357,6 @@ def load_sequence_counts_kallisto(h5file_name = None, spikeids = []):
 
 			num_targets = len(f['aux']['ids'])
 			self.ids = np.array(f['aux']['ids'])
-
-			# self.gene_names = np.zeros(len(self.ids), dtype = str)
-			# for i in xrange(len(self.ids)):
-			# 	print i
-			# 	if self.ids[i] not in spikeids:
-			# 		self.gene_names[i] = mouse_genome.gene_name_of_transcript_id(self.ids[i])
-			
 			self.lengths = np.array(f['aux']['lengths'])
 			self.eff_lengths = np.array(f['aux']['eff_lengths'])
 
@@ -361,15 +401,23 @@ def load_sequence_counts_kallisto(h5file_name = None, spikeids = []):
 	for spikeid in spikeids:
 		spike_locs += np.where(kdata.ids == spikeid)
 	transcript_ids_only = np.delete(kdata.ids,spike_locs)
-	transcripts = data_frame[data_frame['target_id'].isin(transcript_ids_only)]
+	transcripts = data_frame.loc[data_frame['target_id'].isin(transcript_ids_only)]
+	transcripts.is_copy = False
 
 	# Compute TPM
 	if kdata.num_bootstrap == 0:
-		divisor = (transcripts.est_counts / transcripts.eff_length).sum()
-		transcripts['tpm'] = ( (transcripts.est_counts / transcripts.eff_length) / divisor) * 1e6
+		divisor = (transcripts['est_counts'] / transcripts['eff_length']).sum()
+		tpm = ((transcripts['est_counts'] / transcripts['eff_length']) / divisor) * 1e6
+		fpkm = transcripts['est_counts'] / (transcripts['eff_length'] * transcripts['est_counts'].sum()) * 1e9
+		transcripts['fpkm'] = fpkm
+		transcripts['tpm'] = tpm
+
 	else:
-		divisor = (transcripts.est_counts_mean / transcripts.eff_length).sum()
-		transcripts['tpm'] = ( (transcripts.est_counts_mean / transcripts.eff_length) / divisor) * 1e6
+		divisor = (transcripts['est_counts_mean'] / transcripts['eff_length']).sum()
+		tpm = ( (transcripts['est_counts_mean'] / transcripts['eff_length']) / divisor) * 1e6
+		fpkm = transcripts['est_counts_mean'] / (transcripts['eff_length'] * transcripts['est_counts_mean'].sum()) * 1e9
+		transcripts['fpkm'] = fpkm
+		transcripts['tpm'] = tpm
 
 	transcripts.set_index('target_id', inplace = True)
 	spike_ins.set_index('target_id', inplace = True)
@@ -517,9 +565,14 @@ class cell_object():
 		seq_data = pd.HDFStore(h5_file)
 		self.num_mapped = seq_data['quality_control']['num_mapped'].item()/2
 		self.num_unmapped = seq_data['quality_control']['num_unmapped'].item()/2
-		self.transcripts = seq_data['transcripts']
+		
+		# Un comment if we want to keep isoform level information
+		# self.transcripts = seq_data['transcripts']
+
+		# Include data summed over isoforms - be wary of using the counts directly
+		self.fpkm = seq_data['gene_counts'].loc[:,'fpkm']
 		self.spikeins = seq_data['spikeins']
-		self.total_estimated_counts = self.transcripts.est_counts.sum() + self.spikeins.est_counts.sum()
+		self.total_estimated_counts = seq_data['transcripts'].est_counts.sum() + seq_data['spikeins'].est_counts.sum()
 		seq_data.close()
 
 

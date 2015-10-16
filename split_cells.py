@@ -40,14 +40,14 @@ Load cells
 """
 
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
-all_cell_file = 'all_cells_qc.pkl'
+all_cell_file = 'all_cells_norm.pkl'
 all_cells = pickle.load(open(os.path.join(direc,all_cell_file)))
 
-times = [0, 75, 150, 300]
+times = [150]
 
 all_cells_stim = []
 for cell in all_cells:
-	if cell.condition == 'Stim':
+	if cell.condition == 'NoStim':
 		all_cells_stim += [cell]
 
 for t in times:
@@ -57,6 +57,6 @@ for t in times:
 		if cell.time_point == t:
 			all_cells_time += [cell]
 
-	file_name_save = os.path.join(direc, 'all_cells_' + str(t) + 'min.pkl')
+	file_name_save = os.path.join(direc, 'all_cells_' + str(t) + 'min_NoStim_norm.pkl')
 
 	pickle.dump(all_cells_time, open(file_name_save, 'wb'), protocol = pickle.HIGHEST_PROTOCOL)

@@ -38,7 +38,7 @@ Load all the cells
 
 matplotlib.style.use('ggplot')
 
-mouse_genome = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
+# mouse_genome = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
 
 
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
@@ -46,9 +46,9 @@ all_cell_file = 'all_cells.pkl'
 all_cells = pickle.load(open(os.path.join(direc,all_cell_file)))
 
 cell_counter = 0 
-num_cells = 4
+num_cells = 8
 
-fig, axes = plt.subplots(2,num_cells, figsize = (14,10))
+fig, axes = plt.subplots(2,num_cells, figsize = (28,10))
 
 for cell in all_cells:
 	if cell_counter > num_cells - 1:
@@ -60,12 +60,12 @@ for cell in all_cells:
 		axes[0,cell_counter].set_ylabel('Normalized fluorescence (au)')
 		axes[0,cell_counter].set_title('NFkB dynamics for cell ' + str(cell_counter + 1), fontsize = 12)
 
-		sorted_transcripts = cell.transcripts.sort(columns = 'tpm', ascending = False)
+		sorted_transcripts = cell.transcriptome.sort(columns = 'tpm', ascending = False)
 		top_ten_tpm = sorted_transcripts[0:10].tpm
 		top_ten_indices = sorted_transcripts[0:10].index.tolist()
 
-		for i in xrange(len(top_ten_indices)):
-			top_ten_indices[i] = mouse_genome.gene_name_of_transcript_id(top_ten_indices[i])
+		# for i in xrange(len(top_ten_indices)):
+		# 	top_ten_indices[i] = mouse_genome.gene_name_of_transcript_id(top_ten_indices[i])
 
 		ind = np.arange(10)
 		width = 0.35
