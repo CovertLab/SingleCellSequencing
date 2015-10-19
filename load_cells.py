@@ -44,6 +44,9 @@ for library in librarys_to_load:
 			all_cells += [cell]
 
 all_cells_qc = seq_functions.quality_control(all_cells)
+all_cells_qc = seq_functions.remove_unidentified_genes(all_cells_qc)
+all_cells_qc = seq_functions.remove_jackpotting_genes(all_cells_qc)
+all_cells_qc = seq_functions.add_tpm_normalization(all_cells_qc)
 
 file_name_save = os.path.join(direc, 'all_cells_qc.pkl')
 pickle.dump(all_cells_qc, open(file_name_save, 'wb'), protocol = pickle.HIGHEST_PROTOCOL)

@@ -505,7 +505,46 @@ def cell_cluster(list_of_cells, max_clusters = 3):
 
 	return list_of_cells
 
+def remove_unidentified_genes(list_of_cells):
+	cell = list_of_cells[0]
+	gene_keys = cell.fpkm.index
 
+	for gene in gene_keys:
+		fpkm_sum = 0
+		for cell in list_of_cells:
+			fpkm_sum += cell.fpkm.loc[gene]
+		if fpkm_sum == 0 
+			for cell in list_of_cells:
+				cell.fpkm.drop([gene], axis = 0)
+	return list_of_cells
+
+def remove_jackpotting_genes(list_of_cells, jackpot_threshold = 0.1):
+	cell = list_of_cells[0]
+	gene_keys = cell.fpkm.index
+	
+	for cell in list_of_cells:
+		jackpotted_genes = []
+		for gene in gene_keys:
+			fraction_of_transcriptome = cell.fpkm.loc[gene]/cell.fpkm.sum()
+			if fraction_of_transcriptome > jackpot_threshold:
+				jackpotted_genes += [gene]
+		total_fpkm = cell.fpkm.sum()
+		for gene in jackpotted_genes:
+			total_fpkm -= cell.fpkm.loc[gene]
+		mean_fpkm = total_fpkm/(len(gene_keys) - len(jackpotted_genes))
+		for gene in jackpotted_genes
+			cell.fpkm.loc[gene] = mean_fpkm
+	return list_of_cells
+
+def add_tpm_normalization(list_of_cells):
+	for cell in list_of_cells:
+		gene_keys = cell.fpkm.index
+		cell.tpm = cell.fpkm
+		total_fpkm = cell.fpkm.sum()
+		for gene in gene_keys:
+			cell.tpm.loc[gene] = cell.fpkm.loc[gene]/total_fpkm * 1e6
+	return list_of_cells
+	
 class dynamics_class():
 	def __init__(self, matfiles):
 		dynamics_dict = {}
