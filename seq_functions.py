@@ -508,41 +508,69 @@ def cell_cluster(list_of_cells, max_clusters = 3):
 def remove_unidentified_genes(list_of_cells):
 	cell = list_of_cells[0]
 	gene_keys = cell.fpkm.index
+	print "Removing unidentified genes ..."
+	
+	counter = 0
 
-	for gene in gene_keys:
-		fpkm_sum = 0
-		for cell in list_of_cells:
-			fpkm_sum += cell.fpkm.loc[gene]
-		if fpkm_sum == 0 
-			for cell in list_of_cells:
-				cell.fpkm.drop([gene], axis = 0)
+	zero_genes = set(cell.fpkm[cell.fpkm == 0].index.tolist())
+	for cell in list_of_cells:
+		zero_genes_new = set(cell.fpkm[cell.fpkm == 0].index.tolist())
+		zero_genes &= zero_genes_new 
+
+	print str(len(zero_genes)) + ' of ' + str(len(gene_keys)) + ' genes not detected'
+	for cell in list_of_cells:
+		cell.fpkm.drop(list(zero_genes), axis = 0, inplace = True)
+
 	return list_of_cells
 
-def remove_jackpotting_genes(list_of_cells, jackpot_threshold = 0.1):
+def remove_jackpotting_genes(list_of_cells, jackpot_threshold = 0.05):
+	print "Removing jackpotting from transcripts ..."
 	cell = list_of_cells[0]
 	gene_keys = cell.fpkm.index
 	
+	num_removed_genes = 0
 	for cell in list_of_cells:
+
 		jackpotted_genes = []
-		for gene in gene_keys:
-			fraction_of_transcriptome = cell.fpkm.loc[gene]/cell.fpkm.sum()
-			if fraction_of_transcriptome > jackpot_threshold:
-				jackpotted_genes += [gene]
+		fraction_of_transcriptome = cell.fpkm/cell.fpkm.sum()
+		jackpotted_genes = fraction_of_transcriptome[fraction_of_transcriptome > jackpot_threshold].index.tolist()
+
+		num_removed_genes += len(jackpotted_genes)
 		total_fpkm = cell.fpkm.sum()
 		for gene in jackpotted_genes:
 			total_fpkm -= cell.fpkm.loc[gene]
 		mean_fpkm = total_fpkm/(len(gene_keys) - len(jackpotted_genes))
-		for gene in jackpotted_genes
+		for gene in jackpotted_genes:
 			cell.fpkm.loc[gene] = mean_fpkm
+
+	print str(num_removed_genes) + ' jackpotting events identified and removed'
+
 	return list_of_cells
 
 def add_tpm_normalization(list_of_cells):
+	print "Adding tpm normalization to cell objects ..."
 	for cell in list_of_cells:
-		gene_keys = cell.fpkm.index
-		cell.tpm = cell.fpkm
-		total_fpkm = cell.fpkm.sum()
-		for gene in gene_keys:
-			cell.tpm.loc[gene] = cell.fpkm.loc[gene]/total_fpkm * 1e6
+		cell.tpm = cell.fpkm/cell.fpkm.sum() * 1e6
+	return list_of_cells
+
+def remove_low_expression_genes(list_of_cells, tpm_plus_one_threshold = 100):
+	cell = list_of_cells[0]
+	gene_keys = cell.tpm.index
+	num_of_cells = len(list_of_cells)
+	
+	dropout_frequency = pd.DataFrame(np.zeros((len(gene_keys),2), dtype = 'float32'), index = gene_keys, columns = ['tpm','dropout'])
+
+	for cell in list_of_cells:
+		dropout_frequency.loc[:,'tpm'] += (1+cell.tpm)/num_of_cells
+		zero_genes = cell.tpm[cell.tpm == 0].index.tolist()
+		dropout_frequency.ix[zero_genes,'dropout'] += np.float32(num_of_cells) ** -1
+
+	low_expression_genes = dropout_frequency[dropout_frequency['tpm'] + 1 < 100].index.tolist()
+
+	for cell in list_of_cells:
+		cell.fpkm.drop(list(low_expression_genes), axis = 0, inplace = True)
+		cell.tpm.drop(list(low_expression_genes), axis = 0, inplace = True)
+
 	return list_of_cells
 	
 class dynamics_class():

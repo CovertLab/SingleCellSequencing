@@ -40,9 +40,10 @@ for library in librarys_to_load:
 	file_list = os.listdir(lib_path)
 	for h5_file in file_list:
 		if fnmatch.fnmatch(h5_file, r'*.h5'):
+			print h5_file
 			cell = seq_functions.cell_object(h5_file = os.path.join(lib_path, h5_file), dictionary = dynamics_data)
 			all_cells += [cell]
-
+			
 all_cells_qc = seq_functions.quality_control(all_cells)
 all_cells_qc = seq_functions.remove_unidentified_genes(all_cells_qc)
 all_cells_qc = seq_functions.remove_jackpotting_genes(all_cells_qc)
@@ -50,4 +51,7 @@ all_cells_qc = seq_functions.add_tpm_normalization(all_cells_qc)
 
 file_name_save = os.path.join(direc, 'all_cells_qc.pkl')
 pickle.dump(all_cells_qc, open(file_name_save, 'wb'), protocol = pickle.HIGHEST_PROTOCOL)
+
+
+
 

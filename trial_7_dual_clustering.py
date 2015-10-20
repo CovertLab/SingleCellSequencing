@@ -39,10 +39,10 @@ rpy2.robjects.numpy2ri.activate()
 
 # matplotlib.style.use('ggplot')
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
-all_cell_file = 'all_cells_150min_norm.pkl'
-zero_time_file = 'all_cells_150min_NoStim_norm.pkl'
+all_cell_file = 'all_cells_qc_complete.pkl'
+# zero_time_file = 'all_cells_150min_NoStim_norm.pkl'
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
-all_cells_zero = pickle.load(open(os.path.join(direc,zero_time_file)))
+# all_cells_zero = pickle.load(open(os.path.join(direc,zero_time_file)))
 def cleanAxis(ax):
 	ax.set_frame_on(False)
 	for label in ax.axes.get_xticklabels():
@@ -61,15 +61,15 @@ Figure out the length of the longest time trace
 """
 
 
-times = [150]
+times = [300]
 
 R = rpy2.robjects.r
 DTW = importr('dtw')
 
 all_cells = []
+longest_time = 0
+number_of_cells = 0
 for t in times:
-	longest_time = 0
-	number_of_cells = 0
 	for cell in all_cells_total:
 		if cell.time_point == t:
 			number_of_cells += 1
@@ -77,40 +77,43 @@ for t in times:
 			all_cells += [cell]
 
 print len(all_cells)
-number_of_cells_zero = len(all_cells_zero)
+
+# number_of_cells_zero = len(all_cells_zero)
 
 dynamics_matrix = np.zeros((number_of_cells,longest_time))
 
-list_of_genes = all_cells[0].fpkm.index.get_values()
+list_of_genes = all_cells[0].tpm.index.get_values()
+number_of_genes = len(list_of_genes)
+genes_matrix = np.zeros((number_of_cells, number_of_genes))
 
 # Select 2000 highest expressed genes
-avg_expression = []
-avg_expression_zero = []
+# avg_expression = []
+# avg_expression_zero = []
 
-counter = 0 
-for gene in list_of_genes:
-	print counter
-	counter += 1
-	expression = []
-	zero_time_expression = []
-	for cell in all_cells:
-		expression += [cell.fpkm.loc[gene]]
-	for cell in all_cells_zero:
-		zero_time_expression += [cell.fpkm.loc[gene]]
-	avg_expression += [np.mean(expression)]
-	avg_expression_zero += [np.mean(zero_time_expression)]
+# counter = 0 
+# for gene in list_of_genes:
+# 	print counter
+# 	counter += 1
+# 	expression = []
+# 	zero_time_expression = []
+# 	for cell in all_cells:
+# 		expression += [cell.fpkm.loc[gene]]
+# 	for cell in all_cells_zero:
+# 		zero_time_expression += [cell.fpkm.loc[gene]]
+# 	avg_expression += [np.mean(expression)]
+# 	avg_expression_zero += [np.mean(zero_time_expression)]
 
-avg_expression = np.array(avg_expression)
-avg_expression_zero = np.array(avg_expression_zero)
+# avg_expression = np.array(avg_expression)
+# avg_expression_zero = np.array(avg_expression_zero)
 
-genes_sort_ind = np.argsort(avg_expression-avg_expression_zero)
-genes_sort_ind = genes_sort_ind[::-1]
+# genes_sort_ind = np.argsort(avg_expression-avg_expression_zero)
+# genes_sort_ind = genes_sort_ind[::-1]
 
-list_of_chosen_genes = list_of_genes[genes_sort_ind[0:500]]
-number_of_genes = len(list_of_chosen_genes)
+# list_of_chosen_genes = list_of_genes[genes_sort_ind[0:500]]
+# number_of_genes = len(list_of_chosen_genes)
 
-genes_matrix = np.zeros((number_of_cells, number_of_genes))
-genes_matrix_zero = np.zeros((number_of_cells_zero, number_of_genes))
+# genes_matrix = np.zeros((number_of_cells, number_of_genes))
+# genes_matrix_zero = np.zeros((number_of_cells_zero, number_of_genes))
 
 """
 Fill up the dynamics heat map matrix
@@ -133,19 +136,18 @@ start_time = time.time()
 
 cell_counter = 0
 for cell in all_cells:
-	transcriptome = (cell.fpkm.loc[list_of_chosen_genes])/cell.size_factor + 1
-	genes_matrix[cell_counter,:] = transcriptome
+	genes_matrix[cell_counter,:] = cell.tpm.loc[list_of_genes]+1
 	cell_counter += 1
 
-cell_counter = 0
-for cell in all_cells_zero:
-	transcriptome = (cell.fpkm.loc[list_of_chosen_genes])/cell.size_factor + 1
-	genes_matrix_zero[cell_counter,:] = transcriptome
-	cell_counter += 1
+# cell_counter = 0
+# for cell in all_cells_zero:
+# 	transcriptome = (cell.fpkm.loc[list_of_chosen_genes])/cell.size_factor + 1
+# 	genes_matrix_zero[cell_counter,:] = transcriptome
+# 	cell_counter += 1
 
-genes_matrix_zero = np.mean(genes_matrix_zero, axis = 0)
+# genes_matrix_zero = np.mean(genes_matrix_zero, axis = 0)
 
-genes_matrix = np.log2(genes_matrix / genes_matrix_zero)
+genes_matrix = np.log2(genes_matrix)
 
 time_diff = str(round(time.time()-start_time,1))
 print 'Gene matrix filled in %s seconds' % time_diff
@@ -159,9 +161,9 @@ cmap=plt.cm.coolwarm
 ### Scale the max and min colors so that 0 is white/black
 vmin=genes_matrix.min()
 vmax=genes_matrix.max()
-vmax = max([vmax,abs(vmin)])
-vmin = vmax*-1
-norm = mpl.colors.Normalize(vmin/2, vmax/2) ### adjust the max and min to scale these colors
+# vmax = max([vmax,abs(vmin)])
+# vmin = vmax*-1
+norm = mpl.colors.Normalize(vmin, vmax) ### adjust the max and min to scale these colors
 
 ### Scale the Matplotlib window size
 default_window_hight = 8.5
@@ -229,10 +231,12 @@ Perform hierarchical clustering of the transcriptome
 start_time = time.time()
 distance_matrix_genes = np.zeros((number_of_genes, number_of_genes))
 
-for i in xrange(len(list_of_chosen_genes)):
-	print str(i) + ' of ' + str(len(list_of_chosen_genes))
-	for j in xrange(len(list_of_chosen_genes)):	
-		distance_matrix_genes[i,j] = np.linalg.norm(genes_matrix[:,i] - genes_matrix[:,j])
+for i in xrange(len(list_of_genes)):
+	print str(i) + ' of ' + str(len(list_of_genes))
+	for j in xrange(len(list_of_genes)):
+		a = genes_matrix[:,i]
+		b = genes_matrix[:,j]
+		distance_matrix_genes[i,j] = np.linalg.norm(a-b)
 
 ax2 = fig.add_axes([ax2_x, ax2_y, ax2_w, ax2_h], frame_on=True)
 Y_genes = sch.linkage(distance_matrix_genes, method = 'centroid')
@@ -296,7 +300,7 @@ axcb.set_title("colorkey")
 # else:
 # 	plt.rcParams['font.size'] = 8
 
-filename = 'plots/trial_7_dual_clustering_150min_temp.pdf'
+filename = 'plots/trial_7_dual_clustering_75min_temp.pdf'
 plt.savefig(filename)
 print 'Exporting:',filename
 plt.savefig(filename) #,dpi=200
