@@ -128,11 +128,11 @@ def generate_genome_index():
 	option_name += ['--runMode'] 
 	option += ['genomeGenerate']
 	option_name += ['--genomeDir']
-	option += ['/scratch/users/dvanva/Sequencing/Ref_seqs/']
+	option += ['/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna']
 	option_name += ['--genomeFastaFiles']
-	option += ['/scratch/users/dvanva/Sequencing/Ref_seqs/mouse_withSpikeIns.fa']
+	option += ['/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna/mouse_genome_w_spikeins.fa']
 	option_name += ['--sjdbGTFfile']
-	option += ['/scratch/users/dvanva/Sequencing/Ref_seqs/mouse_withSpikeIns.gtf']
+	option += ['/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna/mouse_genome_w_spikeins.gtf']
 	option_name += ['--sjdbOverhang ']
 	option += ['76']
 
@@ -143,19 +143,116 @@ def generate_genome_index():
 	print cmd
 	run_cmd(cmd)
 
-def run_STAR(filename):
+def run_STAR(direc_name, input_filename, genomeDir = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna', trimmed_name = 'trimmed', aligned_name = 'alignedSTAR/'):
+	input_directory = os.path.join(direc_name,trimmed_name)
+	output_directory = os.path.join(direc_name, aligned_name)
+
+	pair1 = os.path.join(input_directory, input_filename+'_R1_trimmed.fq')
+	pair2 = os.path.join(input_directory, input_filename+'_R2_trimmed.fq')
+	
 	option_name = []
 	option = []
 
-	option_name[0] = ' --runThreadN '
-	option[0] = '8'
+	option_name += ['--runThreadN']
+	option += ['8']
+
+	option_name += ['--genomeDir']
+	option += [genomeDir]
+
+	option_name +=['--readFilesIn']
+	option += [pair1]
+
+	option_name += ['']
+	option += [pair2]
+
+	option_name += ['--quantMode']
+	option += ['TranscriptomeSAM']
+
+	option_name += ['--outFileNamePrefix']
+	option +=[output_directory]
+
+	option_name += ['--outFilterType']
+	option += ['BySJout']
+
+	option_name += ['--alignSJoverhangMin']
+	option += ['8']
+
+	option_name += ['--alignSJDBoverhangMin']
+	option += ['1']
+
+	option_name += ['--outFilterMismatchNmax']
+	option += ['999']
+
+	option_name += ['--alignIntronMin']
+	option += ['20']
+
+	option_name += ['--alignIntronMax']
+	option += ['1000000']
+
+	option_name += ['--alignMatesGapMax']
+	option += ['1000000']
+
+	option_name += ['--outSAMattributes', '', '', '', '']
+	option += ['NH', 'HI', 'AS', 'NM', 'MD']
+
+	option_name += ['--outSAMunmapped']
+	option += ['Within']
+
+	cmd = ['STAR']
+
+	for j in xrange(len(option_name)):
+		cmd += [option_name[j]] + [option[j]]
+
+	print cmd
+	run_cmd(cmd)
+
+	# Move files to the output directory
+	log_out_name = os.path.join(output_directory, input_filename+'_Log.out')
+	cmd = ['mv', os.path.join(output_directory, 'Log.out'), log_out_name]
+	run_cmd(cmd)
+
+	log_progress_out_name = os.path.join(output_directory, input_filename+'_Log.progress.out')
+	cmd = ['mv', os.path.join(output_directory, 'Log.progress.out'), log_progress_out_name]
+	run_cmd(cmd)
+
+	log_final_out_name = os.path.join(output_directory, input_filename+'_Log.final.out')
+	cmd = ['mv', os.path.join(output_directory, 'Log.final.out'), log_final_out_name]
+	run_cmd(cmd)
+
+	sj_out_name = os.path.join(output_directory, input_filename+'_SJ.out.tab')
+	cmd = ['mv', os.path.join(output_directory, 'SJ.out.tab'), sj_out_name]
+	run_cmd(cmd)
+
+	sam_output_name = os.path.join(output_directory, input_filename+'.sam')
+	cmd = ['mv', os.path.join(output_directory, 'Aligned.out.sam'), sam_output_name]
+	run_cmd(cmd)
+
+	transcriptome_bam_output_name = os.path.join(output_directory, input_filename+'_aligned_to_transcriptome.bam')
+	cmd = ['mv', os.path.join(output_directory, 'Aligned.toTranscriptome.out.bam'), transcriptome_bam_output_name]
+	run_cmd(cmd)
+
+def run_STAR_direc(direc_name, trimmed_name = 'trimmed', aligned_name = 'alignedSTAR'):
+	output_directory = os.path.join(direc_name, aligned_name)
+	file_list = os.listdir(os.path.join(direc_name, trimmed_name))
+	for seq_file in file_list:
+		sft = seq_file.split('.')[0]
+		sft2 = sft.split('_')
+		seq_file_name = sft[0] + '_' + sft2[1]
+		if not os.path.exists(os.path.join(output_directory, seq_file_name + '.sam')):
+			run_STAR(direc_name, seq_file_name)
 
 def run_kallisto_index(input_filename, output_filename):
 	cmd = ['kallisto', 'index', '-i', output_filename, input_filename]
 	run_cmd(cmd)
+	for seq_file in file_list:
+		sft = seq_file.split('.')[0]
+		sft2 = sft.split('_')
+		seq_file_name = sft[0] + '_' + sft2[1]
+		if not os.path.exists(os.path.join(output_directory, seq_file_name + '.sam')):
+			run_STAR(direc_name, seq_file_name)
 
 def kallisto_direc(direc_name):
-	output_directory = os.path.join(direc_name, 'align')
+	output_directory = os.path.join(direc_name, 'aligned')
 	file_list = os.listdir(os.path.join(direc_name,'trimmed'))
 	for seq_file in file_list:
 		sft = seq_file.split('.')[0]
@@ -557,7 +654,7 @@ def remove_low_expression_genes(list_of_cells, tpm_plus_one_threshold = 100):
 	cell = list_of_cells[0]
 	gene_keys = cell.tpm.index
 	num_of_cells = len(list_of_cells)
-	
+
 	dropout_frequency = pd.DataFrame(np.zeros((len(gene_keys),2), dtype = 'float32'), index = gene_keys, columns = ['tpm','dropout'])
 
 	for cell in list_of_cells:
