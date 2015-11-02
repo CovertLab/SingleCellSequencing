@@ -216,11 +216,11 @@ for cell in all_cells:
 
 cell_counter = 0
 for cell in all_cells:
-	genes_matrix2[cell_counter,:] = np.squeeze(np.array(cell.tpm_mean.loc[list_of_genes]+1)) / np.squeeze(np.array(total_tpm_mean.loc[list_of_genes]+1))
+	genes_matrix2[cell_counter,:] = np.squeeze(np.array(cell.tpm.loc[list_of_genes]+1)) / np.squeeze(np.array(zero_tpm_mean.loc[list_of_genes]+1))
 	cell_counter += 1
 
 # genes_matrix = np.log2(genes_matrix)
-# genes_matrix2 = np.log2(genes_matrix2)
+genes_matrix2 = np.log2(genes_matrix2)
 
 time_diff = str(round(time.time()-start_time,1))
 print 'Gene matrix filled in %s seconds' % time_diff
@@ -229,8 +229,8 @@ print 'Gene matrix filled in %s seconds' % time_diff
 vmin=genes_matrix2.min()
 vmax=genes_matrix2.max()
 
-vmin = 0
-vmax = 2
+vmin = -10
+vmax = 10
 norm = mpl.colors.Normalize(vmin, vmax) ### adjust the max and min to scale these colors
 
 time_diff = str(round(time.time()-start_time,1))
@@ -347,7 +347,7 @@ for cluster in clusters_to_plot:
 	indices_to_plot += list(np.where(ind_genes == cluster)[0])
 print indices_to_plot
 
-indices_to_plot = [1259,  1264, 1265, 1267, 1268, 1269, 1270, 1271, 1272, 1273, 1262, 1277, 1279]
+indices_to_plot = [1269, 1267, 1264, 1259, 1271, 1273, 1265, 1270, 1272, 1262, 1277, 1279, 1268]
 column_header = list_of_genes[indices_to_plot]
 genes_matrix_plot = data_matrix[:,indices_to_plot]
 
@@ -374,7 +374,7 @@ for i in xrange(genes_matrix_plot.shape[1]):
 	print column_header[i]
 	ax_heatmap.text(i-.5, -4, ''+column_header[i], rotation = 270)
 
-filename = 'plots/trial_8_dual_clustering_75min_clusters_foldchange_reduced2.pdf'
+filename = 'plots/trial_8_dual_clustering_75min_clusters_raw_vszero_reduced.pdf'
 
 print 'Exporting:',filename
 plt.savefig(filename) #,dpi=200

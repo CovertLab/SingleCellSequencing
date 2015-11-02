@@ -36,6 +36,8 @@ import rpy2
 import rpy2.robjects.numpy2ri
 from rpy2.robjects.packages import importr
 rpy2.robjects.numpy2ri.activate()
+from dba import dba
+from dba import align_to
 
 mpl.rcParams['pdf.fonttype'] = 42
 # matplotlib.style.use('ggplot')
@@ -113,14 +115,18 @@ for j in xrange(len(cluster_id_list)):
 	num_of_cells = len(np.where(ind_dynamics == cluster_id)[0])
 	dyn_matrix = np.zeros((num_of_cells,longest_time))
 	
+	dyn_list = []
+
 	cell_counter = 0
 	for cell in all_cells:
 		if cell.clusterID == cluster_id:
 			dyn_matrix[cell_counter,0:dynam.shape[0]] = cell.NFkB_dynamics
+			dyn_list += [cell.NFkB_dynamics]
 			cell_counter += 1
-	temp = R.DBA(dyn_matrix)
+	# temp = R.DBA(dyn_matrix)
+	temp = dba(dyn_list)
 	print temp
-	cluster_dynamics_DBA[j,:] = temp
+	cluster_dynamics_DBA[j,:] = temp[0]
 	print cluster_dynamics_DBA
 
 colors = ['g', 'b', 'r']
@@ -131,14 +137,14 @@ for j in xrange(len(cluster_id_list)):
 
 	for cell in all_cells:
 		if cell.clusterID == cluster_id_list[j]:
-			plt.plot(times,cell.NFkB_dynamics, color = str(.8))
+			plt.plot(times,align_to(cluster_dynamics_DBA[j,:],cell.NFkB_dynamics), color = str(.8))
 
 	plt.plot(times, cluster_dynamics_DBA[j,:], color = colors[j], linewidth = 2, label = 'Cluster ' + str(j+1))
 
-	plt.xlabel('Time (min)', fontsize = 16)
+	plt.xlabel('Time', fontsize = 16)
 	plt.ylabel('Nuclear localization (au)', fontsize = 16)
 	plt.xlim([0, 80])
-	plt.xticks([0,80],  fontsize = 16)
+	plt.xticks([],  fontsize = 16)
 	plt.ylim([0, 1.05])
 	plt.yticks([0, 1],  fontsize = 16)
 

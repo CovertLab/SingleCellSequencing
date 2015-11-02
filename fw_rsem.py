@@ -1,5 +1,5 @@
 from fireworks import Firework, LaunchPad, Workflow, ScriptTask
-from firetasks import AlignSTARTask
+from firetasks import Align_star_Task, Count_rsem_Task
 import seq_functions
 import argparse
 import os
@@ -12,20 +12,34 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 	workflow_dependencies = collections.defaultdict(list)
 
 	library_dirs = [os.path.join(sequencing_directory, library_prefix + str(i + 1)) for i in xrange(num_libraries)]
-	subdirs = ['unzipped', 'trimmed', 'aligned', 'aligned_star', 'quant_rsem','bammed', 'sorted', 'counted']
+	subdirs = ["aligned_star", "quant_rsem", "counted_rsem"]
+
+	for library_dir in library_dirs:
+		seq_functions.make_directories(library_dir, subdirs)
 
 	for library_dir in library_dirs:
 		seq_functions.make_directories(library_dir, subdirs)
 
 		name = "AlignSTAR_%s" % os.path.basename(library_dir)
-		fw_count = Firework(
+		fw_align = Firework(
 			[
-				AlignSTARTask(library_path = library_dir, trimmed_name = "trimmed", aligned_name = "aligned_star/", quant_name = "quant_rsem/")
+				Align_star_Task(library_path = library_dir, trimmed_name = "trimmed", aligned_name = "aligned_star/", quant_name = "quant_rsem/")
 			],
 			name = name,
 			spec = {"_queueadapter": {"job_name": name, "ntasks_per_node": 8}},
 			)
+		workflow_fireworks.append(fw_align)
+
+		name = "Count_%s" % os.path.basename(library_dir)
+		fw_count = Firework(
+			[
+				Count_rsem_Task(library_path = library_dir, aligned_name = "aligned_star", quant_name = "quant_rsem", counted_name = "counted_rsem", spikeids = ['AM1780SpikeIn1', 'AM1780SpikeIn4', 'AM1780SpikeIn7'])
+			],
+			name = name,
+			spec = {"_queueadapter": {"job_name": name}},
+			)
 		workflow_fireworks.append(fw_count)
+		workflow_dependencies[fw_align].append(fw_count)
 
 	lpad.add_wf(
 		Workflow(workflow_fireworks, links_dict = workflow_dependencies)

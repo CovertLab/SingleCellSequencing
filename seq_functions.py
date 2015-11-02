@@ -119,6 +119,35 @@ def count_reads(file_name):
 	cmd = ['wc', 'l', file_name]
 	counts = int(run_cmd(cmd).split()[0])
 
+def run_star_rsem(direc_name, input_filename, genomeDir = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna', rsem_reference_name = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna/rsem/rsem_mouse_genome_ref', trimmed_name = 'trimmed', aligned_name = 'aligned_star/', quant_name = 'quant_rsem/'):
+	
+	# Align with STAR and quantify with rsem
+	input_directory = os.path.join(direc_name,trimmed_name)
+	aligned_directory = os.path.join(direc_name, aligned_name)
+	quant_directory = os.path.join(direc_name, quant_name)
+
+	pair1 = os.path.join(input_directory, input_filename+'_R1_trimmed.fq')
+	pair2 = os.path.join(input_directory, input_filename+'_R2_trimmed.fq')
+
+	cmd = ['rsem-calculate-expression', '--star', '--keep-intermediate-files', '--paired-end', pair1, pair2, rsem_reference_name, os.path.join(aligned_directory, input_filename)]
+	print cmd
+	run_cmd(cmd)
+
+	genes_name = os.path.join(aligned_directory, input_filename +'.genes.results')
+	genes_moved = os.path.join(quant_directory, input_filename +'.genes.results')
+
+	cmd = ['mv', genes_name, genes_moved]
+	print cmd
+	run_cmd(cmd)
+
+	isoform_name = os.path.join(aligned_directory, input_filename +'.isoforms.results')
+	isoform_moved = os.path.join(quant_directory, input_filename +'.isoforms.results')
+
+	cmd = ['mv', isoform_name, isoform_moved]
+	print cmd
+	run_cmd(cmd)
+
+
 def generate_genome_index():
 	option_name = []
 	option = []
@@ -143,95 +172,8 @@ def generate_genome_index():
 	print cmd
 	run_cmd(cmd)
 
-def run_STAR(direc_name, input_filename, genomeDir = '/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna', trimmed_name = 'trimmed', aligned_name = 'alignedSTAR/'):
-	input_directory = os.path.join(direc_name,trimmed_name)
-	output_directory = os.path.join(direc_name, aligned_name)
 
-	pair1 = os.path.join(input_directory, input_filename+'_R1_trimmed.fq')
-	pair2 = os.path.join(input_directory, input_filename+'_R2_trimmed.fq')
-	
-	option_name = []
-	option = []
-
-	option_name += ['--runThreadN']
-	option += ['8']
-
-	option_name += ['--genomeDir']
-	option += [genomeDir]
-
-	option_name +=['--readFilesIn']
-	option += [pair1]
-
-	option_name += ['']
-	option += [pair2]
-
-	option_name += ['--quantMode']
-	option += ['TranscriptomeSAM']
-
-	option_name += ['--outFileNamePrefix']
-	option +=[output_directory]
-
-	option_name += ['--outFilterType']
-	option += ['BySJout']
-
-	option_name += ['--alignSJoverhangMin']
-	option += ['8']
-
-	option_name += ['--alignSJDBoverhangMin']
-	option += ['1']
-
-	option_name += ['--outFilterMismatchNmax']
-	option += ['999']
-
-	option_name += ['--alignIntronMin']
-	option += ['20']
-
-	option_name += ['--alignIntronMax']
-	option += ['1000000']
-
-	option_name += ['--alignMatesGapMax']
-	option += ['1000000']
-
-	option_name += ['--outSAMattributes', '', '', '', '']
-	option += ['NH', 'HI', 'AS', 'NM', 'MD']
-
-	option_name += ['--outSAMunmapped']
-	option += ['Within']
-
-	cmd = ['STAR']
-
-	for j in xrange(len(option_name)):
-		cmd += [option_name[j]] + [option[j]]
-
-	print cmd
-	run_cmd(cmd)
-
-	# Move files to the output directory
-	log_out_name = os.path.join(output_directory, input_filename+'_Log.out')
-	cmd = ['mv', os.path.join(output_directory, 'Log.out'), log_out_name]
-	run_cmd(cmd)
-
-	log_progress_out_name = os.path.join(output_directory, input_filename+'_Log.progress.out')
-	cmd = ['mv', os.path.join(output_directory, 'Log.progress.out'), log_progress_out_name]
-	run_cmd(cmd)
-
-	log_final_out_name = os.path.join(output_directory, input_filename+'_Log.final.out')
-	cmd = ['mv', os.path.join(output_directory, 'Log.final.out'), log_final_out_name]
-	run_cmd(cmd)
-
-	sj_out_name = os.path.join(output_directory, input_filename+'_SJ.out.tab')
-	cmd = ['mv', os.path.join(output_directory, 'SJ.out.tab'), sj_out_name]
-	run_cmd(cmd)
-
-	sam_output_name = os.path.join(output_directory, input_filename+'.sam')
-	cmd = ['mv', os.path.join(output_directory, 'Aligned.out.sam'), sam_output_name]
-	run_cmd(cmd)
-
-	transcriptome_bam_output_name = os.path.join(output_directory, input_filename+'_aligned_to_transcriptome.bam')
-	cmd = ['mv', os.path.join(output_directory, 'Aligned.toTranscriptome.out.bam'), transcriptome_bam_output_name]
-	run_cmd(cmd)
-
-def run_STAR_direc(direc_name, trimmed_name = 'trimmed', aligned_name = 'alignedSTAR'):
+def run_STAR_direc(direc_name, trimmed_name = 'trimmed', aligned_name = 'aligned_star'):
 	output_directory = os.path.join(direc_name, aligned_name)
 	file_list = os.listdir(os.path.join(direc_name, trimmed_name))
 	for seq_file in file_list:
@@ -240,6 +182,12 @@ def run_STAR_direc(direc_name, trimmed_name = 'trimmed', aligned_name = 'aligned
 		seq_file_name = sft[0] + '_' + sft2[1]
 		if not os.path.exists(os.path.join(output_directory, seq_file_name + '.sam')):
 			run_STAR(direc_name, seq_file_name)
+
+def generate_rsem_reference_genome():
+	cmd = ['rsem-prepare-reference','--star','--gtf','/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna/mouse_genome_w_spikeins.gtf','/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna/mouse_genome_w_spikeins.fa','/scratch/PI/mcovert/dvanva/sequencing/ref_seq_dna/rsem/rsem_mouse_genome_ref']
+	print cmd
+	run_cmd(cmd)
+
 
 def run_kallisto_index(input_filename, output_filename):
 	cmd = ['kallisto', 'index', '-i', output_filename, input_filename]
@@ -705,8 +653,109 @@ class dynamics_class():
 		self.time_point_dict = time_point_dict
 		self.condition_dict = condition_dict
 
+def count_rsem_files(direc_name, bammed_direc = 'aligned_star', quant_direc = 'quant_rsem', counted_direc = 'counted_rsem', spikeids = []):
+	quant_path = os.path.join(direc_name, quant_direc)
+	counted_path = os.path.join(direc_name, counted_direc)
+	bammed_path = os.path.join(direc_name, bammed_direc)
+
+	file_list = os.listdir(quant_path)
+
+	mouse_genome = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/gtf/mus_musculus/Mus_musculus.GRCm38.81.gtf.gz', transcript_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/cdna/Mus_musculus.GRCm38.cdna.all.fa.gz', protein_fasta_path_or_url = 'ftp://ftp.ensembl.org/pub/release-81/fasta/mus_musculus/pep/Mus_musculus.GRCm38.pep.all.fa.gz')
+	
+	for seq_file_temp in file_list:
+		if fnmatch.fnmatch(seq_file_temp, r'*.isoforms.results'):
+			seq_file = seq_file_temp
+
+	gene_names = mouse_genome.gene_names()
+
+	transcript_dict = {}
+	counter = 0
+	for gene in gene_names:
+		transcript_dict[gene] = mouse_genome.transcript_ids_of_gene_name(gene)
+		counter += 1
+		print counter
+
+	for seq_file in file_list:
+		print seq_file, fnmatch.fnmatch(seq_file, r'*.isoforms.results')
+		if fnmatch.fnmatch(seq_file, r'*.isoforms.results'):
+			bfs = seq_file.split('.')
+			bam_file_sorted_by_loc = bfs[0] + '.transcript.sorted.bam'
+			num_mapped, num_unmapped = bam_read_count(os.path.join(bammed_path, bam_file_sorted_by_loc))
+			transcripts, spikeins = load_sequence_counts_rsem(rsem_file = os.path.join(quant_path,seq_file), spikeids = spikeids)
+
+			filename_save = os.path.join(counted_path, seq_file + '.h5')
+			print 'Saving ' + filename_save
+			
+			store = pd.HDFStore(filename_save)
+
+			d = {'num_mapped': num_mapped, 'num_unmapped': num_unmapped}
+			quality_control = pd.DataFrame(d, index = [0])
+
+			# Create a transcript table indexed by gene name - sum over all isoforms
+			counts_list = []
+			fpkm_list = []
+			tpm_list = []
+			for j in xrange(len(gene_names)):
+				gene = gene_names[j]
+				transcript_list = transcript_dict[gene]
+				counts = 0
+				fpkm = 0
+				tpm = 0
+				for transcript in transcript_list:
+					if transcript in transcripts.index:
+						counts += transcripts.loc[transcript]['est_counts']
+						fpkm += transcripts.loc[transcript]['fpkm']
+						tpm += transcripts.loc[transcript]['tpm']
+				counts_list += [counts]
+				fpkm_list += [fpkm]
+				tpm_list += [tpm]
+
+			d = {'gene_name': gene_names, 'est_counts': counts_list, 'fpkm': fpkm_list, 'tpm': tpm_list}
+			gene_counts = pd.DataFrame(d)
+			gene_counts.set_index('gene_name', inplace = True)
+
+			# Store data frames in HDF5 format
+			store['quality_control'] = quality_control 
+			store['transcripts'] = transcripts
+			store['gene_counts'] = gene_counts
+			store['spikeins'] = spikeins
+			store.close()
+
+
+def load_sequence_counts_rsem(rsem_file = None, spikeids = []):
+	data_frame = pd.read_csv(rsem_file, sep = r'\t')
+	spike_mask = data_frame['transcript_id'].isin(spikeids)
+	spikeins = data_frame[spike_mask]
+	spikeins.is_copy = False
+
+	transcript_mask = np.logical_not(spike_mask)
+	transcripts = data_frame[transcript_mask]
+	transcripts.is_copy = False
+
+	transcripts = transcripts[transcripts['effective_length'] > 0]
+
+	fpkm = transcripts['expected_count'] / (transcripts['effective_length'] * transcripts['expected_count'].sum()) * 1e9
+	divisor = (transcripts['expected_count'] / transcripts['effective_length']).max()
+	tpm = ( (transcripts['expected_count'] / transcripts['effective_length']) / divisor) * 1e6
+
+
+	transcripts['FPKM'] = fpkm
+	transcripts['TPM'] = tpm
+
+	transcripts.rename(columns = {'transcript_id' : 'target_id', 'FPKM': 'fpkm', 'TPM': 'tpm', 'effective_length': 'eff_length', 'expected_count': 'est_counts'}, inplace = True)
+	spikeins.rename(columns = {'gene_id' : 'target_id', 'FPKM': 'fpkm', 'TPM': 'tpm', 'effective_length': 'eff_length', 'expected_count': 'est_counts'}, inplace = True)
+
+	transcripts.set_index('target_id', inplace = True)
+	spikeins.set_index('target_id', inplace = True)
+
+	print transcripts
+	print spikeins
+
+	return transcripts, spikeins
+
+
 class cell_object():
-	def __init__(self, h5_file = None, dictionary = None):
+	def __init__(self, h5_file = None, rsem_file = None, dictionary = None):
 
 		cell_id = parse_filename(os.path.basename(h5_file))
 
