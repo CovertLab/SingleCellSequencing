@@ -25,5 +25,5 @@ class Align_star_Task(FireTaskBase):
 
 		for seq_file in file_list_unique:
 			print r'Aligning ' + seq_file
-			seq_functions.run_star_rsem(self["library_path"], seq_file_name, trimmed_name = self["trimmed_name"], aligned_name = self["aligned_name"], quant_name = self["quant_name"])
+			seq_functions.run_star_rsem(self["library_path"], seq_file, trimmed_name = self["trimmed_name"], aligned_name = self["aligned_name"], quant_name = self["quant_name"])
 
