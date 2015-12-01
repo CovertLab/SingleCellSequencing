@@ -37,10 +37,13 @@ import rpy2.robjects.numpy2ri
 from rpy2.robjects.packages import importr
 rpy2.robjects.numpy2ri.activate()
 
+import sys
+sys.setrecursionlimit(10000)
+
 mpl.rcParams['pdf.fonttype'] = 42
 # matplotlib.style.use('ggplot')
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
-all_cell_file = 'all_cells_qc_complete.pkl'
+all_cell_file = 'all_cells_qc_w_jackpot.pkl'
 
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 
@@ -50,7 +53,7 @@ print len(all_cells_total)
 Figure out the length of the longest time trace
 """
 
-times = [75]
+times = [300]
 
 R = rpy2.robjects.r
 DTW = importr('dtw')
@@ -155,25 +158,31 @@ ax2_w = axc_w
 Perform hierarchical clustering of the dynamics
 """
 
-start_time = time.time()
-distance_matrix_dynamics = np.zeros((number_of_cells, number_of_cells))
-for i in xrange(number_of_cells):
-	print str(i+1) + ' of ' + str(number_of_cells)
-	for j in xrange(number_of_cells):
-		alignment = R.dtw(dynamics_matrix[i,:], dynamics_matrix[j,:], keep = True)
-		distance_matrix_dynamics[i,j] = alignment.rx('distance')[0][0]
+# start_time = time.time()
+# distance_matrix_dynamics = np.zeros((number_of_cells, number_of_cells))
+# for i in xrange(number_of_cells):
+# 	print str(i+1) + ' of ' + str(number_of_cells)
+# 	for j in xrange(number_of_cells):
+# 		alignment = R.dtw(dynamics_matrix[i,:], dynamics_matrix[j,:], keep = True)
+# 		distance_matrix_dynamics[i,j] = alignment.rx('distance')[0][0]
+# np.savez('/home/dvanva/SingleCellSequencing/300_dynamics_distance_matrix.npz', distance_matrix_dynamics = distance_matrix_dynamics)
+dynamics_load = np.load('/home/dvanva/SingleCellSequencing/300_dynamics_distance_matrix.npz')
+distance_matrix_dynamics = dynamics_load["distance_matrix_dynamics"]
 
 ax1 = fig.add_axes([ax1_x, ax1_y, ax1_w, ax1_h], frame_on=False) # frame_on may be False
 Y_dynamics = sch.linkage(distance_matrix_dynamics, method = 'centroid')
-Z_dynamics = sch.dendrogram(Y_dynamics, orientation = 'right')
-ind_dynamics = sch.fcluster(Y_dynamics,3,'maxclust')
+Z_dynamics = sch.dendrogram(Y_dynamics, orientation = 'right', color_threshold = 0.3*np.amax(Y_dynamics[:,2]))
+ind_dynamics = sch.fcluster(Y_dynamics,0.3*np.amax(Y_dynamics[:,2]),'distance')
 ax1.set_xticks([])
 ax1.set_yticks([])
 time_diff = str(round(time.time()-start_time,1))
+
 print 'Dynamics clustering completed in %s seconds' % time_diff
 
 for j in xrange(number_of_cells):
 	all_cells[j].clusterID = ind_dynamics[j]
+	if all_cells[j].clusterID > 2:
+		all_cells[j].clusterID = 1
 
 for cell in all_cells:
 	print cell.clusterID
@@ -213,26 +222,33 @@ genes_matrix2 = np.zeros((number_of_cells, number_of_genes), dtype = 'float32')
 
 cell_counter = 0
 for cell in all_cells:
-	genes_matrix[cell_counter,:] = np.squeeze(np.array(cell.tpm_mean.loc[list_of_genes]+1)) / np.squeeze(np.array(total_tpm_mean.loc[list_of_genes]+1))
+	genes_matrix[cell_counter,:] = np.squeeze(np.array(cell.tpm_mean.loc[list_of_genes]+1)) / np.squeeze(np.array(zero_tpm_mean.loc[list_of_genes]+1))
 	cell_counter += 1
 
 cell_counter = 0
 for cell in all_cells:
-	genes_matrix2[cell_counter,:] = np.squeeze(np.array(cell.tpm_mean.loc[list_of_genes]+1)) / np.squeeze(np.array(total_tpm_mean.loc[list_of_genes]+1))
+	genes_matrix2[cell_counter,:] = np.squeeze(np.array(cell.tpm.loc[list_of_genes]+1)) / np.squeeze(np.array(zero_tpm_mean.loc[list_of_genes]+1))
 	cell_counter += 1
 
 # genes_matrix = np.log2(genes_matrix)
-# genes_matrix2 = np.log2(genes_matrix2)
+genes_matrix2 = np.log2(genes_matrix2)
 
 time_diff = str(round(time.time()-start_time,1))
 print 'Gene matrix filled in %s seconds' % time_diff
 
 ### Scale the max and min colors so that 0 is white/black
-vmin=genes_matrix2.min()
-vmax=genes_matrix2.max()
+# vmin=genes_matrix2.min()
+# vmax=genes_matrix2.max()
 
-vmin = 0
-vmax = 2
+vmin = -10
+vmax = 10
+
+# vmin = 0
+# vmax = 2
+
+# vmin = 0
+# vmax = 14
+
 norm = mpl.colors.Normalize(vmin, vmax) ### adjust the max and min to scale these colors
 
 time_diff = str(round(time.time()-start_time,1))
@@ -256,8 +272,8 @@ for i in xrange(len(list_of_genes)):
 
 ax2 = fig.add_axes([ax2_x, ax2_y, ax2_w, ax2_h], frame_on=False)
 Y_genes = sch.linkage(distance_matrix_genes, method = 'centroid')
-Z_genes = sch.dendrogram(Y_genes, color_threshold = 0.4*max(Y_genes[:,2]))
-ind_genes = sch.fcluster(Y_genes, 0.2*max(Y_genes[:,2]),'distance')
+Z_genes = sch.dendrogram(Y_genes, color_threshold = 0.01*max(Y_genes[:,2]))
+ind_genes = sch.fcluster(Y_genes, 0.01*max(Y_genes[:,2]),'distance')
 ax2.set_xticks([])
 ax2.set_yticks([])
 time_diff = str(round(time.time()-start_time,1))
@@ -277,7 +293,7 @@ idx1 = Z_dynamics['leaves'] ### apply the clustering for the gene-dendrograms to
 data_matrix = data_matrix[idx1,:]
 ind_dynamics = ind_dynamics[idx1] ### reorder the flat cluster to match the order of the leaves the dendrogram
 
-print ind_genes
+print np.amax(ind_genes)
 
 ### taken from http://stackoverflow.com/questions/2982929/plotting-results-of-hierarchical-clustering-ontop-of-a-matrix-of-data-in-python/3011894#3011894
 im = axm.matshow(data_matrix, aspect='auto', origin='lower', cmap=cmap, norm=norm) ### norm=norm added to scale coloring of expression with zero = white or black
@@ -317,7 +333,7 @@ axcb.set_title("colorkey")
 # else:
 # 	plt.rcParams['font.size'] = 8
 
-filename = 'plots/trial_8_dual_clustering_75min_foldchange.pdf'
+filename = 'plots/trial_8_dual_clustering_300min_foldchange.pdf'
 print 'Exporting:',filename
 plt.savefig(filename) 
 plt.show()
@@ -325,16 +341,16 @@ plt.show()
 """
 Only plot some of the gene clusters
 """
-
-clusters_to_plot = [2,3,4,5]
+print np.amax(ind_genes)
+clusters_to_plot = [1,2,4,5,6,7,8,9]
 
 """
 Plot dendrogram
 """
 
-fig = plt.figure(figsize = (8.5,11))
+fig = plt.figure(figsize = (20,11))
 ax_dendro = fig.add_axes([ax1_x, ax1_y, ax1_w, ax1_h], frame_on=False) # frame_on may be False
-Z = sch.dendrogram(Y_dynamics, orientation = 'right')
+Z = sch.dendrogram(Y_dynamics, orientation = 'right', color_threshold = 0.3*np.amax(Y_dynamics[:,2]))
 
 ax_dendro.set_xticks([])
 ax_dendro.set_yticks([])
@@ -347,9 +363,9 @@ ax_heatmap = fig.add_axes([axm_x, axm_y, axm_w, axm_h])  # axes for the data mat
 indices_to_plot = []
 for cluster in clusters_to_plot:
 	indices_to_plot += list(np.where(ind_genes == cluster)[0])
-print indices_to_plot
+# print indices_to_plot
 
-indices_to_plot = [1269, 1267, 1264, 1259, 1271, 1273, 1265, 1270, 1272, 1262, 1277, 1279, 1268]
+# indices_to_plot = [1269, 1267, 1264, 1259, 1271, 1273, 1265, 1270, 1272, 1262, 1277, 1279, 1268]
 column_header = list_of_genes[indices_to_plot]
 genes_matrix_plot = data_matrix[:,indices_to_plot]
 
@@ -373,10 +389,10 @@ axcb.tick_params(labelsize = 8)
 axcb.set_title("colorkey")
 
 for i in xrange(genes_matrix_plot.shape[1]):
-	print column_header[i]
-	ax_heatmap.text(i-.5, -4, ''+column_header[i], rotation = 270)
+	# print column_header[i]
+	ax_heatmap.text(i-.5, -10, ''+column_header[i], rotation = 270)
 
-filename = 'plots/trial_8_dual_clustering_75min_clusters_raw_vszero_reduced.pdf'
+filename = 'plots/trial_8_dual_clustering_300min_clusters_raw_reduced.pdf'
 
 print 'Exporting:',filename
 plt.savefig(filename) #,dpi=200

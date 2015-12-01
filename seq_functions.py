@@ -325,21 +325,25 @@ def count_hdf5_files(direc_name, bammed_direc = 'bammed', aligned_direc = 'align
 			counts_list = []
 			fpkm_list = []
 			tpm_list = []
+			length_list = []
 			for j in xrange(len(unique_gene_names)):
 				gene = unique_gene_names[j]
 				transcript_list = transcript_dict[gene]
 				counts = 0
 				fpkm = 0
 				tpm = 0
+				mean_eff_length = 0
 				for transcript in transcript_list:
 					counts += transcripts.loc[transcript]['est_counts']
 					fpkm += transcripts.loc[transcript]['fpkm']
 					tpm += transcripts.loc[transcript]['tpm']
+					mean_eff_length += transcripts.loc[transcript]['eff_length'] / len(transcript_list)
 				counts_list += [counts]
 				fpkm_list += [fpkm]
 				tpm_list += [tpm]
+				length_list += [mean_eff_length]
 
-			d = {'gene_name': unique_gene_names, 'est_counts': counts_list, 'fpkm': fpkm_list, 'tpm': tpm_list}
+			d = {'gene_name': unique_gene_names, 'est_counts': counts_list, 'fpkm': fpkm_list, 'tpm': tpm_list, 'mean_eff_length': length_list}
 			gene_counts = pd.DataFrame(d)
 			gene_counts.set_index('gene_name', inplace = True)
 
@@ -568,6 +572,24 @@ def remove_unidentified_genes(list_of_cells):
 
 	return list_of_cells
 
+def remove_unidentified_genes_rsem(list_of_cells):
+	cell = list_of_cells[0]
+	gene_keys = cell.fpkm_rsem.index
+	print "Removing unidentified genes ..."
+	
+	counter = 0
+
+	zero_genes = set(cell.fpkm[cell.fpkm_rsem == 0].index.tolist())
+	for cell in list_of_cells:
+		zero_genes_new = set(cell.fpkm[cell.fpkm_rsem == 0].index.tolist())
+		zero_genes &= zero_genes_new 
+
+	print str(len(zero_genes)) + ' of ' + str(len(gene_keys)) + ' genes not detected'
+	for cell in list_of_cells:
+		cell.fpkm_rsem.drop(list(zero_genes), axis = 0, inplace = True)
+
+	return list_of_cells
+
 def remove_jackpotting_genes(list_of_cells, jackpot_threshold = 0.05):
 	print "Removing jackpotting from transcripts ..."
 	cell = list_of_cells[0]
@@ -596,6 +618,12 @@ def add_tpm_normalization(list_of_cells):
 	print "Adding tpm normalization to cell objects ..."
 	for cell in list_of_cells:
 		cell.tpm = cell.fpkm/cell.fpkm.sum() * 1e6
+	return list_of_cells
+
+def add_tpm_normalization_rsem(list_of_cells):
+	print "Adding tpm normalization to cell objects ..."
+	for cell in list_of_cells:
+		cell.tpm_rsem = cell.fpkm_rsem/cell.fpkm_rsem.sum() * 1e6
 	return list_of_cells
 
 def remove_low_expression_genes(list_of_cells, tpm_plus_one_threshold = 100):
@@ -755,7 +783,7 @@ def load_sequence_counts_rsem(rsem_file = None, spikeids = []):
 
 
 class cell_object():
-	def __init__(self, h5_file = None, rsem_file = None, dictionary = None):
+	def __init__(self, h5_file = None, dictionary = None):
 
 		cell_id = parse_filename(os.path.basename(h5_file))
 
@@ -784,8 +812,55 @@ class cell_object():
 
 		# Include data summed over isoforms - be wary of using the counts directly
 		self.fpkm = seq_data['gene_counts'].loc[:,'fpkm']
+		self.est_counts = seq_data['gene_counts'].loc[:,'est_counts']
+		self.mean_eff_length = seq_data['gene_counts'].loc[:,'mean_eff_length']
 		self.spikeins = seq_data['spikeins']
 		self.total_estimated_counts = seq_data['transcripts'].est_counts.sum() + seq_data['spikeins'].est_counts.sum()
 		seq_data.close()
+
+class cell_object_rsem():
+	def __init__(self, h5_kallisto_file = None, h5_rsem_file = None, dictionary = None):
+
+		cell_id = parse_filename(os.path.basename(h5_kallisto_file))
+
+		# Load experimental metadata
+		self.id = cell_id
+		self.library_number = dictionary.library_number_dict[cell_id]
+		self.cell_number = dictionary.cell_number_dict[cell_id]
+		self.chip_number = dictionary.chip_no_dict[cell_id]
+		self.capture_site = dictionary.capture_site_dict[cell_id]
+		self.time_point = dictionary.time_point_dict[cell_id]
+		self.number_of_cells = dictionary.num_of_cells_in_well_dict[cell_id]
+		self.condition = dictionary.condition_dict[cell_id]
+		self.clusterID = 0
+		self.quality = 0
+
+		# Load signaling dynamics
+		self.NFkB_dynamics = dictionary.dynamics_dict[cell_id]
+
+		# Load transcriptome
+		seq_data_kal = pd.HDFStore(h5_kallisto_file)
+		seq_data_rsem = pd.HDFStore(h5_rsem_file)
+
+		self.num_mapped = seq_data_kal['quality_control']['num_mapped'].item()/2
+		self.num_unmapped = seq_data_kal['quality_control']['num_unmapped'].item()/2
+
+		self.num_mapped_rsem = seq_data_rsem['quality_control']['num_mapped'].item()/2
+		self.num_unmapped_rsem = seq_data_rsem['quality_control']['num_unmapped'].item()/2
+		
+		# Un comment if we want to keep isoform level information
+		# self.transcripts = seq_data['transcripts']
+
+		# Include data summed over isoforms - be wary of using the counts directly
+		self.fpkm = seq_data_kal['gene_counts'].loc[:,'fpkm']
+		self.spikeins = seq_data_kal['spikeins']
+		self.total_estimated_counts = seq_data_kal['transcripts'].est_counts.sum() + seq_data_kal['spikeins'].est_counts.sum()
+		
+		self.fpkm_rsem = seq_data_rsem['gene_counts'].loc[:,'fpkm']
+		self.spikeins_rsem = seq_data_rsem['spikeins']
+		self.total_estimated_counts_rsem = seq_data_rsem['transcripts'].est_counts.sum() + seq_data_rsem['spikeins'].est_counts.sum()
+
+		seq_data_kal.close()
+		seq_data_rsem.close()
 
 

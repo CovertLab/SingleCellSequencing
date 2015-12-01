@@ -12,7 +12,7 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 	workflow_dependencies = collections.defaultdict(list)
 
 	library_dirs = [os.path.join(sequencing_directory, library_prefix + str(i + 1)) for i in xrange(num_libraries)]
-	subdirs = ['unzipped', 'trimmed', 'aligned', 'bammed', 'sorted', 'counted', 'pythonized']
+	subdirs = ['unzipped', 'trimmed', 'aligned_kallisto', 'bammed', 'sorted', 'counted', 'pythonized']
 
 	for library_dir in library_dirs:
 		seq_functions.make_directories(library_dir, subdirs)
@@ -20,7 +20,7 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 		name = "Count_%s" % os.path.basename(library_dir)
 		fw_count = Firework(
 			[
-				CountTask(library_path = library_dir, aligned_name = "aligned", bammed_name = "bammed", counted_name = "counted", spikeids = ['Spike1', 'Spike4', 'Spike7'])
+				CountTask(library_path = library_dir, aligned_name = "aligned_kallisto", bammed_name = "bammed", counted_name = "counted", spikeids = ['Spike1', 'Spike4', 'Spike7'])
 			],
 			name = name,
 			spec = {"_queueadapter": {"job_name": name}},

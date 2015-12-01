@@ -40,11 +40,10 @@ rpy2.robjects.numpy2ri.activate()
 mpl.rcParams['pdf.fonttype'] = 42
 # matplotlib.style.use('ggplot')
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
-all_cell_file = 'all_cells_qc_complete.pkl'
+all_cell_file = 'all_cells_rsem_qc.pkl'
 
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 
-print len(all_cells_total)
 
 """
 Figure out the length of the longest time trace
@@ -60,7 +59,7 @@ longest_time = 0
 number_of_cells = 0
 for t in times:
 	for cell in all_cells_total:
-		if cell.time_point == t and cell.condition == 'Stim':
+		if cell.time_point == t:
 			number_of_cells += 1
 			longest_time = np.amax([longest_time, cell.NFkB_dynamics.shape[0]])
 			all_cells += [cell]
@@ -85,6 +84,11 @@ zero_tpm_mean = pd.DataFrame(np.zeros((len(list_of_genes)), dtype = 'float32'), 
 
 for cell in all_cells_zero:
 	zero_tpm_mean.loc[:,'tpm'] += cell.tpm/num_of_cells_zero
+
+zero_tpm_mean_rsem = pd.DataFrame(np.zeros((len(list_of_genes)), dtype = 'float32'), index = list_of_genes, columns = ['tpm_rsem'])
+
+for cell in all_cells_zero:
+	zero_tpm_mean_rsem.loc[:,'tpm_rsem'] += cell.tpm_rsem/num_of_cells_zero
 
 genes_matrix = np.zeros((number_of_cells, number_of_genes), dtype = 'float32')
 
@@ -154,7 +158,6 @@ ax2_w = axc_w
 """
 Perform hierarchical clustering of the dynamics
 """
-
 start_time = time.time()
 distance_matrix_dynamics = np.zeros((number_of_cells, number_of_cells))
 for i in xrange(number_of_cells):
@@ -182,7 +185,8 @@ for cell in all_cells:
 """
 Regroup cells into clusters
 """
-all_clusters = []
+# all_clusters = []
+# all_clusters_rsem = []
 for cluster in xrange(1,np.amax(ind_dynamics)+1):
 	temp_cluster = []
 	for cell in all_cells:
@@ -190,17 +194,29 @@ for cluster in xrange(1,np.amax(ind_dynamics)+1):
 			temp_cluster += [cell]
 
 	tpm_mean = pd.DataFrame(np.zeros((len(list_of_genes)), dtype = 'float32'), index = list_of_genes, columns = ['tpm'])
+	tpm_mean_rsem = pd.DataFrame(np.zeros((len(list_of_genes)), dtype = 'float32'), index = list_of_genes, columns = ['tpm'])
+
 	for cell in temp_cluster:
 		tpm_mean.loc[:,'tpm'] += cell.tpm/len(temp_cluster)
+		tpm_mean_rsem.loc[:,'tpm'] += cell.tpm_rsem/len(temp_cluster)
 
-	all_clusters += [tpm_mean]
+	# all_clusters += [tpm_mean]
+	# all_clusters_rsem += [tpm_mean_rsem]
+
 	for cell in all_cells:
 		if cell.clusterID == cluster:
 			cell.tpm_mean = tpm_mean
+			cell.tpm_mean_rsem = tpm_mean_rsem
+
 
 total_tpm_mean = pd.DataFrame(np.zeros((len(list_of_genes)), dtype = 'float32'), index = list_of_genes, columns = ['tpm'])
 for cell in all_cells:
 	total_tpm_mean.loc[:,'tpm'] += cell.tpm/len(all_cells)
+
+total_tpm_mean_rsem = pd.DataFrame(np.zeros((len(list_of_genes)), dtype = 'float32'), index = list_of_genes, columns = ['tpm_rsem'])
+for cell in all_cells:
+	total_tpm_mean_rsem.loc[:,'tpm_rsem'] += cell.tpm_rsem/len(all_cells)
+
 
 """
 Fill up the gene heat map matrix
@@ -218,11 +234,11 @@ for cell in all_cells:
 
 cell_counter = 0
 for cell in all_cells:
-	genes_matrix2[cell_counter,:] = np.squeeze(np.array(cell.tpm_mean.loc[list_of_genes]+1)) / np.squeeze(np.array(total_tpm_mean.loc[list_of_genes]+1))
+	genes_matrix2[cell_counter,:] = np.squeeze(np.array(cell.tpm_rsem.loc[list_of_genes]+1)) #/ np.squeeze(np.array(total_tpm_mean_rsem.loc[list_of_genes]+1))
 	cell_counter += 1
 
 # genes_matrix = np.log2(genes_matrix)
-# genes_matrix2 = np.log2(genes_matrix2)
+genes_matrix2 = np.log2(genes_matrix2)
 
 time_diff = str(round(time.time()-start_time,1))
 print 'Gene matrix filled in %s seconds' % time_diff
@@ -232,7 +248,7 @@ vmin=genes_matrix2.min()
 vmax=genes_matrix2.max()
 
 vmin = 0
-vmax = 2
+vmax = 14
 norm = mpl.colors.Normalize(vmin, vmax) ### adjust the max and min to scale these colors
 
 time_diff = str(round(time.time()-start_time,1))
@@ -317,7 +333,7 @@ axcb.set_title("colorkey")
 # else:
 # 	plt.rcParams['font.size'] = 8
 
-filename = 'plots/trial_8_dual_clustering_75min_foldchange.pdf'
+filename = 'plots/trial_11_dual_clustering_75min_foldchange_rsem.pdf'
 print 'Exporting:',filename
 plt.savefig(filename) 
 plt.show()
@@ -376,7 +392,7 @@ for i in xrange(genes_matrix_plot.shape[1]):
 	print column_header[i]
 	ax_heatmap.text(i-.5, -4, ''+column_header[i], rotation = 270)
 
-filename = 'plots/trial_8_dual_clustering_75min_clusters_raw_vszero_reduced.pdf'
+filename = 'plots/trial_11_dual_clustering_75min_clusters_raw_vszero_reduced_rsem.pdf'
 
 print 'Exporting:',filename
 plt.savefig(filename) #,dpi=200

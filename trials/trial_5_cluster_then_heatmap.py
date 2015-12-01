@@ -58,7 +58,7 @@ Figure out the length of the longest time trace
 """
 
 
-times = [75, 150, 300]
+times = [150] #[75, 150, 300]
 
 R = rpy2.robjects.r
 DTW = importr('dtw')
@@ -68,7 +68,7 @@ for t in times:
 	longest_time = 0
 	number_of_cells = 0
 	for cell in all_cells:
-		if cell.time_point == t:
+		if cell.time_point == t and cell.condition == 'Stim':
 			number_of_cells += 1
 			longest_time = np.amax([longest_time, cell.NFkB_dynamics.shape[0]])
 
@@ -80,7 +80,7 @@ for t in times:
 
 	cell_counter = 0
 	for cell in all_cells:
-		if cell.time_point == t:
+		if cell.time_point == t and cell.condition == 'Stim':
 			dynam = cell.NFkB_dynamics
 			dynamics_matrix[cell_counter,0:dynam.shape[0]] = dynam
 			cell_counter += 1
@@ -91,11 +91,14 @@ for t in times:
 
 	distance_matrix = np.zeros((number_of_cells, number_of_cells))
 	for i in xrange(number_of_cells):
+		print i
 		for j in xrange(number_of_cells):
-			print i, j
+			# print i, j
 			# distance_matrix[i,j] = np.linalg.norm(dynamics_matrix[i,:] - dynamics_matrix[j,:])
 			alignment = R.dtw(dynamics_matrix[i,:], dynamics_matrix[j,:], keep = True)
 			distance_matrix[i,j] = alignment.rx('distance')[0][0]
+
+	np.savez('/home/dvanva/SingleCellSequencing/150_dynamics_distance_matrix.npz', distance_matrix = distance_matrix)
 
 	Y = sch.linkage(distance_matrix, method = 'centroid')
 
@@ -105,7 +108,7 @@ for t in times:
 
 	fig = plt.figure()
 	ax_dendro = fig.add_axes([0.09, 0.1, 0.2, 0.8], frame_on = False)
-	Z = sch.dendrogram(Y, orientation = 'right')
+	Z = sch.dendrogram(Y, orientation = 'right', color_threshold = 0.3*np.amax(Y[:,2]))
 
 	ax_dendro.set_xticks([])
 	ax_dendro.set_yticks([])

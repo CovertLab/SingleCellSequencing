@@ -26,7 +26,7 @@ def main(sequencing_directory, library_prefix, num_libraries, raw_data_dir):
 				Align_star_Task(library_path = library_dir, trimmed_name = "trimmed", aligned_name = "aligned_star/", quant_name = "quant_rsem/")
 			],
 			name = name,
-			spec = {"_queueadapter": {"job_name": name, "ntasks_per_node": 8}},
+			spec = {"_queueadapter": {"job_name": name, "ntasks_per_node": 8, "walltime": '24:00:00'}},
 			)
 		workflow_fireworks.append(fw_align)
 
