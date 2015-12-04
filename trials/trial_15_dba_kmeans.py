@@ -58,7 +58,7 @@ all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 Figure out the length of the longest time trace
 """
 
-time_point = 300
+time_point = 150
 n_clust = 4
 
 
@@ -70,8 +70,10 @@ for cell in all_cells_total:
 		number_of_cells += 1
 		longest_time = np.amax([longest_time, cell.NFkB_dynamics.shape[0]])
 		all_cells += [cell]
-dynamics_matrix = np.zeros((number_of_cells,longest_time), dtype = 'float32')
 
+	# if cell.time_point > time_point and cell.condition == 'Stim':
+	# 	number_of_cells += 1
+	# 	all_cells += [cell]
 
 """
 Fill up the dynamics heat map matrix
@@ -81,8 +83,10 @@ start_time = time.time()
 cell_counter = 0
 dyn_list = []
 for cell in all_cells:
-	dynam = cell.NFkB_dynamics
-	dynamics_matrix[cell_counter,0:dynam.shape[0]] = dynam
+	if cell.time_point == time_point:
+		dynam = cell.NFkB_dynamics
+	# elif cell.time_point > time_point:
+	# 	dynam = cell.NFkB_dynamics[0:longest_time]
 	dyn_list += [dynam]
 	cell_counter += 1
 
@@ -93,9 +97,26 @@ print 'Dynamics matrix filled in %s seconds' % time_diff
 """
 Perform DBA/kmeans clustering of the dynamics
 """
-start_time = time.time()
-centers, errors, weights = k_dba(dyn_list, n_clust)
 
+num_iters = 1
+start_time = time.time()
+error_sum = np.Inf
+for j in xrange(num_iters):
+	print j
+	centers, errors, weights = k_dba(dyn_list, n_clust, max_iters = 60)
+	error_sum_new = np.sum(errors*errors)
+	if error_sum_new < error_sum:
+		error_sum = error_sum_new
+		centers_save = centers
+		weights_save = weights
+
+centers = centers_save
+weights = weights_save
+
+#Permute 300 time point so it matches 150 time point
+# if time_point == 300:
+# 	centers = [centers[1], centers[0], centers[3],centers[2]]
+# 	weights = [weights[1], weights[0], weights[3], weights[2]]
 time_diff = str(round(time.time()-start_time,1))
 print 'Dynamics clustering completed in %s seconds' % time_diff
 

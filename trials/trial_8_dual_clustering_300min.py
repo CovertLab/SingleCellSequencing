@@ -170,7 +170,7 @@ dynamics_load = np.load('/home/dvanva/SingleCellSequencing/300_dynamics_distance
 distance_matrix_dynamics = dynamics_load["distance_matrix_dynamics"]
 
 ax1 = fig.add_axes([ax1_x, ax1_y, ax1_w, ax1_h], frame_on=False) # frame_on may be False
-Y_dynamics = sch.linkage(distance_matrix_dynamics, method = 'centroid')
+Y_dynamics = sch.linkage(distance_matrix_dynamics, method = 'ward')
 Z_dynamics = sch.dendrogram(Y_dynamics, orientation = 'right', color_threshold = 0.3*np.amax(Y_dynamics[:,2]))
 ind_dynamics = sch.fcluster(Y_dynamics,0.3*np.amax(Y_dynamics[:,2]),'distance')
 ax1.set_xticks([])

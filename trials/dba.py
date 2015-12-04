@@ -11,7 +11,7 @@ from dtw import dtw as _dtw
 
 _RELATIVE_TOLERANCE = 1e-2
 _MAX_ITERS = 15
-_WARP_PENALTY = 2
+_WARP_PENALTY = 200
 
 dtw = partial(_dtw, warp_penalty = _WARP_PENALTY)
 
@@ -31,6 +31,8 @@ def dba(sequences, size = None, tol = _RELATIVE_TOLERANCE, max_iters = _MAX_ITER
 		size = max(len(sequence) for sequence in sequences)
 
 	center = np.zeros(size)
+	# center = sum(sequences)/len(sequences)
+
 	last_error = np.inf
 
 	previous_centers = []

@@ -37,7 +37,7 @@ rpy2.robjects.numpy2ri.activate()
 
 # matplotlib.style.use('ggplot')
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
-all_cell_file = 'all_cells_qc.pkl'
+all_cell_file = 'all_cells_qc_w_jackpot.pkl'
 all_cells = pickle.load(open(os.path.join(direc,all_cell_file)))
 
 def cleanAxis(ax):
@@ -58,7 +58,7 @@ Figure out the length of the longest time trace
 """
 
 
-times = [150] #[75, 150, 300]
+times = [75] #[75, 150, 300]
 
 R = rpy2.robjects.r
 DTW = importr('dtw')
@@ -89,18 +89,19 @@ for t in times:
 	Perform hierarchical clustering
 	"""
 
-	distance_matrix = np.zeros((number_of_cells, number_of_cells))
-	for i in xrange(number_of_cells):
-		print i
-		for j in xrange(number_of_cells):
-			# print i, j
-			# distance_matrix[i,j] = np.linalg.norm(dynamics_matrix[i,:] - dynamics_matrix[j,:])
-			alignment = R.dtw(dynamics_matrix[i,:], dynamics_matrix[j,:], keep = True)
-			distance_matrix[i,j] = alignment.rx('distance')[0][0]
+	# distance_matrix = np.zeros((number_of_cells, number_of_cells))
+	# for i in xrange(number_of_cells):
+	# 	print i
+	# 	for j in xrange(number_of_cells):
+	# 		# print i, j
+	# 		# distance_matrix[i,j] = np.linalg.norm(dynamics_matrix[i,:] - dynamics_matrix[j,:])
+	# 		alignment = R.dtw(dynamics_matrix[i,:], dynamics_matrix[j,:], keep = True)
+	# 		distance_matrix[i,j] = alignment.rx('distance')[0][0]
 
-	np.savez('/home/dvanva/SingleCellSequencing/150_dynamics_distance_matrix.npz', distance_matrix = distance_matrix)
-
-	Y = sch.linkage(distance_matrix, method = 'centroid')
+	# np.savez('/home/dvanva/SingleCellSequencing/150_dynamics_distance_matrix.npz', distance_matrix = distance_matrix)
+	dynamics_load = np.load('/home/dvanva/SingleCellSequencing/75_dynamics_distance_matrix.npz')
+	distance_matrix = dynamics_load['dynamics_distance_matrix']
+	Y = sch.linkage(distance_matrix, method = 'ward')
 
 	"""
 	Plot dendrogram
