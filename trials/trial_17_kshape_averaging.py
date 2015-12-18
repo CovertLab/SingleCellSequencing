@@ -51,7 +51,7 @@ all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 Figure out the length of the longest time trace
 """
 
-time_point = [75]
+time_point = [300]
 
 R = rpy2.robjects.r
 DTW = importr('dtw')
@@ -140,7 +140,7 @@ colors = ['g', 'r', 'c','purple','yellow']
 for j in xrange(len(cluster_id_list)):
 	
 	times = np.arange(0,longest_time)*5
-	# plt.clf()
+	plt.clf()
 
 	# for cell in all_cells:
 	# 	if cell.clusterID == cluster_id_list[j]:
@@ -158,8 +158,8 @@ for j in xrange(len(cluster_id_list)):
 	# plt.yticks([np.amin(cluster_dynamics_DBA)*1.05, np.amax(cluster_dynamics_DBA)*1.05],  fontsize = 16)
 
 	plt.tight_layout()
-file_name = "kshape_all_clusters_"+str(time_point[0])+"min_all.pdf"
-plt.savefig("plots/kshape/" + file_name)
+	file_name = "kshape_all_clusters_"+str(time_point[0])+"min_cluster_" + str(j) + ".pdf"
+	plt.savefig("plots/kshape/" + file_name)
 	
 
 

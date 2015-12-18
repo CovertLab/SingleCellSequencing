@@ -77,7 +77,7 @@ inflammatory_genes = ["Cxcl3", "Cxcl2", "Lif", "Ccl4", "Csf3", "Il1f9", "Ccl3", 
 regulatory_genes = ["Nlrp3", "Nfkbiz", "Tnfaip2", "Nfkbia", "Tnfaip3", "Nfatc1"]
 metabolic_genes = ["Hmox", "Prdx1", "Hdc", "Ptgs2", "Irg1"]
 other_genes = ["Plaur", "Sqstm1", "Clec4e", "Sdc4", "Procr", "Slpi", "Plk2", "Saa3", "Slc7a11", "Cish", "Gp49a", "Hcar2", "Gpr84", "Malt1"]
-inflammatory_genes = ["Ccl3", "Ccl5"]
+inflammatory_genes = ["Ccl5"]
 
 """
 Analyze all the time points
@@ -160,48 +160,75 @@ for time_point in times_to_analyze:
 
 		fpm_list = []
 		jp_list = []
+		ratio_list = []
+		post_list = []
 		for cluster in cluster_list[str(time_point)]:
-			list_of_cells_r = ro.vectors.StrVector(cluster_name_dict[str(time_point)][str(cluster)])
-			r("list_of_cells = " + list_of_cells_r.r_repr())
-			r("""joint_posterior = scde.posteriors(models = o.ifm[list_of_cells,], gene_counts, o.prior, n.cores = 4)""")
-			r("jp = joint_posterior[" + gene_name + ",]")
-			
-			fpms = ro.r("colnames(joint_posterior)")
-			fpms = np.float32(pandas2ri.ri2py(fpms))
+			if time_point == 0:
+				list_of_cells_r = ro.vectors.StrVector(cluster_name_dict[str(time_point)][str(cluster)])
+				r("list_of_cells = " + list_of_cells_r.r_repr())
+				r("""joint_posterior = scde.posteriors(models = o.ifm[list_of_cells,], gene_counts, o.prior, n.cores = 4)""")
+				r("jp_0 = joint_posterior[" + gene_name + ",]")
+				
+				fpms = ro.r("colnames(joint_posterior)")
+				fpms = np.float32(pandas2ri.ri2py(fpms))
 
-			jp = ro.r("jp")
-			jp = np.float32(pandas2ri.ri2py(jp))
+				jp = ro.r("jp_0")
+				jp = np.float32(pandas2ri.ri2py(jp))
 
-			fpm_list += [fpms]
-			jp_list += [jp]
+				fpm_list += [fpms]
+				jp_list += [jp]
 
+			else:
+				list_of_cells_r = ro.vectors.StrVector(cluster_name_dict[str(time_point)][str(cluster)])
+				r("list_of_cells = " + list_of_cells_r.r_repr())
+				r("""joint_posterior = scde.posteriors(models = o.ifm[list_of_cells,], gene_counts, o.prior, n.cores = 4)""")
+				r("jp = joint_posterior[" + gene_name + ",]")
+				
+				fpms = ro.r("colnames(joint_posterior)")
+				fpms = np.float32(pandas2ri.ri2py(fpms))
+
+				jp = ro.r("jp")
+				jp = np.float32(pandas2ri.ri2py(jp))
+
+				fpm_list += [fpms]
+				jp_list += [jp]
+
+				r("ratio = scde:::calculate.ratio.posterior(t(jp), t(jp_0), o.prior, n.cores = 2)")
+
+				ratios = 10 ** np.float32(pandas2ri.ri2py(r("colnames(ratio)")))
+				post = np.float32(pandas2ri.ri2py(r("ratio")))
+				ratio_list += [ratios]
+				post_list += [post]
 
 		"""
 		Plot posteriors
 		"""
 
-		colors = ['g', 'r', 'b', 'k']
+		if time_point == 300:
+			colors = ['g', 'r', 'b', 'k']
 
-		plt.clf()
+			plt.clf()
 
-		max_jp = np.amax(jp_list[0])
-		for j in xrange(len(fpm_list)):
-			fpm = fpm_list[j]
-			fpm_log2 = np.log2(fpm + 1e-50)
-			jp = jp_list[j]
+			max_jp = np.amax(jp_list[0])
+			for j in xrange(len(fpm_list)):
+				fpm = fpm_list[j]
+				fpm_log2 = np.log2(fpm + 1e-50)
+				jp = jp_list[j]
 
-			max_jp = np.maximum(max_jp, np.amax(jp))
-			plt.plot(fpm_log2, jp, color = colors[j], linewidth = 2, label = 'Cluster ' + str(j+1))
-			plt.xlabel('log2(FPM)', fontsize = 16)
-			plt.ylabel('Probability density', fontsize = 16)
-			plt.title(gene + " " + str(time_point) + " minutes", fontsize = 16)
-			plt.xlim([0,30])
-			plt.xticks([0,10,20,30],  fontsize = 16)
-			plt.ylim([0, 1.05*max_jp])
-			plt.yticks([0, 1.05*max_jp],  fontsize = 16)
+				print ratio_list[j].shape
+				print post_list[j].shape
+				max_jp = np.maximum(max_jp, np.amax(post_list[j]))
+				plt.plot(ratio_list[j], np.squeeze(post_list[j]), color = colors[j], linewidth = 2, label = 'Cluster ' + str(j+1))
+				plt.xlabel('log2(FPM)', fontsize = 16)
+				plt.ylabel('Probability density', fontsize = 16)
+				plt.title(gene + " " + str(time_point) + " minutes", fontsize = 16)
+				plt.xlim([0,300])
+				plt.xticks([0,300],  fontsize = 16)
+				plt.ylim([0, 1.05*max_jp])
+				plt.yticks([0, 1.05*max_jp],  fontsize = 16)
 
-		plt.tight_layout()
-		file_name = "trial_18_" + gene + "_" + str(time_point) + "min" + ".pdf"
-		plt.savefig("plots/" + file_name)
+			plt.tight_layout()
+			file_name = "trial_18_" + gene + "_" + str(time_point) + "min_ratio" + ".pdf"
+			plt.savefig("plots/" + file_name)
 
 

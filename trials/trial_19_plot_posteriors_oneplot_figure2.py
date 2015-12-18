@@ -69,22 +69,17 @@ r("""load("/scratch/PI/mcovert/dvanva/sequencing/counts_data.RData")""")
 
 # Load pickle file with cell objects
 direc = '/scratch/PI/mcovert/dvanva/sequencing/'
-all_cell_file = 'all_cells_qc_complete.pkl'
+all_cell_file = 'all_cells_all_detected_genes_qc_w_jackpot.pkl'
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 
 # Determine which genes to look at
-inflammatory_genes = ["Cxcl3", "Cxcl2", "Lif", "Ccl4", "Csf3", "Il1f9", "Ccl3", "Ccl5", "Tnf", "Il1a", "Il1b", "Tnfsf9", "Ccl20", "Il1f6", "Il27", "Il6"]
-regulatory_genes = ["Nlrp3", "Nfkbiz", "Tnfaip2", "Nfkbia", "Tnfaip3", "Nfatc1"]
-metabolic_genes = ["Hmox", "Prdx1", "Hdc", "Ptgs2", "Irg1"]
-other_genes = ["Plaur", "Sqstm1", "Clec4e", "Sdc4", "Procr", "Slpi", "Plk2", "Saa3", "Slc7a11", "Cish", "Gp49a", "Hcar2", "Gpr84", "Malt1"]
-inflammatory_genes = ["Ccl3", "Ccl5"]
+genes_to_plot = ["Prdx1", "Ccl5", "Ccl3", "Saa3", "Il1f9"]
 
 """
 Analyze all the time points
 """
-cluster_list = {}
-cluster_name_dict = {'0':{}, '75':{}, '150':{}, '300':{}}
-times_to_analyze = [0, 300]
+
+times_to_analyze = [300]
 for time_point in times_to_analyze:
 
 	print "Analyzing " + str(time_point) + " minute time point"
@@ -115,42 +110,37 @@ for time_point in times_to_analyze:
 	Perform hierarchical clustering of the dynamics
 	"""
 	distance_matrix_dynamics = np.zeros((number_of_cells, number_of_cells))
-	if time_point != 0:
-		dynamics_load = np.load('/home/dvanva/SingleCellSequencing/' + str(time_point)+'_dynamics_distance_matrix_kshape.npz')
-		distance_matrix_dynamics = dynamics_load["distance_matrix"]
 
-		Y_dynamics = sch.linkage(distance_matrix_dynamics, method = 'ward')
-		ind_dynamics = sch.fcluster(Y_dynamics,0.5*np.amax(Y_dynamics[:,2]),'distance')
+	dynamics_load = np.load('/home/dvanva/SingleCellSequencing/' + str(time_point)+'_dynamics_distance_matrix_kshape.npz')
+	distance_matrix_dynamics = dynamics_load["distance_matrix"]
 
-	if time_point == 0:
-		cluster_list[str(time_point)] = np.arange(1,2)
-	else:
-		cluster_list[str(time_point)] = np.arange(np.amin(ind_dynamics), np.amax(ind_dynamics)+1)
+	Y_dynamics = sch.linkage(distance_matrix_dynamics, method = 'ward')
+	ind_dynamics = sch.fcluster(Y_dynamics,0.5*np.amax(Y_dynamics[:,2]),'distance')
+	cluster_list = np.arange(np.amin(ind_dynamics), np.amax(ind_dynamics)+1)
 
-
-	if time_point == 0:
-		for j in xrange(number_of_cells):
-			all_cells[j].clusterID = 1
-	else:
-		for j in xrange(number_of_cells):
-			all_cells[j].clusterID = ind_dynamics[j]
+	for j in xrange(number_of_cells):
+		all_cells[j].clusterID = ind_dynamics[j]
 
 	cluster_dict = {}
+	cluster_name_dict = {}
 
 	for cell in all_cells:
 		cluster_dict[cell.id] = str(cell.clusterID)
 
-	for cluster in cluster_list[str(time_point)]:
-		cluster_name_dict[str(time_point)][str(cluster)] = []
+	for cluster in cluster_list:
+		cluster_name_dict[str(cluster)] = []
 		for cell in all_cells:
 			if cell.clusterID == cluster:
-				cluster_name_dict[str(time_point)][str(cluster)] += [cell.id]
+				cluster_name_dict[str(cluster)] += [cell.id]
 
 	"""
 	Compute posterior FPM distribution for a given gene
 	"""
+	plt.clf()
+	fig, axes = plt.subplots(len(genes_to_plot) ,1, figsize = (10,10))
+	counter = 0
 
-	for gene in inflammatory_genes:
+	for gene in genes_to_plot:
 		gene_name = """'""" + gene + """'"""
 
 		scde = importr("scde")
@@ -160,8 +150,8 @@ for time_point in times_to_analyze:
 
 		fpm_list = []
 		jp_list = []
-		for cluster in cluster_list[str(time_point)]:
-			list_of_cells_r = ro.vectors.StrVector(cluster_name_dict[str(time_point)][str(cluster)])
+		for cluster in cluster_list:
+			list_of_cells_r = ro.vectors.StrVector(cluster_name_dict[str(cluster)])
 			r("list_of_cells = " + list_of_cells_r.r_repr())
 			r("""joint_posterior = scde.posteriors(models = o.ifm[list_of_cells,], gene_counts, o.prior, n.cores = 4)""")
 			r("jp = joint_posterior[" + gene_name + ",]")
@@ -182,8 +172,6 @@ for time_point in times_to_analyze:
 
 		colors = ['g', 'r', 'b', 'k']
 
-		plt.clf()
-
 		max_jp = np.amax(jp_list[0])
 		for j in xrange(len(fpm_list)):
 			fpm = fpm_list[j]
@@ -191,17 +179,20 @@ for time_point in times_to_analyze:
 			jp = jp_list[j]
 
 			max_jp = np.maximum(max_jp, np.amax(jp))
-			plt.plot(fpm_log2, jp, color = colors[j], linewidth = 2, label = 'Cluster ' + str(j+1))
-			plt.xlabel('log2(FPM)', fontsize = 16)
-			plt.ylabel('Probability density', fontsize = 16)
-			plt.title(gene + " " + str(time_point) + " minutes", fontsize = 16)
-			plt.xlim([0,30])
-			plt.xticks([0,10,20,30],  fontsize = 16)
-			plt.ylim([0, 1.05*max_jp])
-			plt.yticks([0, 1.05*max_jp],  fontsize = 16)
+			axes.flatten()[counter].plot(fpm_log2, jp, color = colors[j], linewidth = 2, label = 'Cluster ' + str(j+1))
+			axes.flatten()[counter].set_xlabel('log2(FPM)', fontsize = 16)
+			axes.flatten()[counter].set_ylabel('Probability density', fontsize = 16)
+			axes.flatten()[counter].set_title(gene + " " + str(time_point) + " minutes", fontsize = 16)
+			axes.flatten()[counter].set_xlim([0,20])
+			axes.flatten()[counter].set_xticks([0,10,20])
+			axes.flatten()[counter].set_ylim([0, 1.05*max_jp])
+			axes.flatten()[counter].set_yticks([0, 1.05*max_jp])
+		counter += 1
 
-		plt.tight_layout()
-		file_name = "trial_18_" + gene + "_" + str(time_point) + "min" + ".pdf"
-		plt.savefig("plots/" + file_name)
+	fig.tight_layout()
+	file_name = "trial_19_fig2" + str(time_point) + "min" + ".pdf"
+	plt.savefig("plots/" + file_name)
+
+
 
 
