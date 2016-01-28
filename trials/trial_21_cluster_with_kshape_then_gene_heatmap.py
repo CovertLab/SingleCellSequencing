@@ -75,7 +75,7 @@ all_cell_file = 'all_cells_qc_complete.pkl'
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 
 # Determine which genes to look at
-genes_to_plot = ["Prdx1", "Ccl5", "Ccl3", "Saa3", "Il1f9", "Mmp3", "Cxcl10"]
+genes_to_plot = ["Prdx1", "Ccl5", "Ccl3", "Saa3", "Il1f9"]
 
 """
 Analyze all the time points
@@ -148,6 +148,7 @@ for time_point in times_to_analyze:
 			counter2 += 1
 		counter1 += 1
 
+
 	"""
 	Plot dendrogram
 	"""
@@ -163,19 +164,38 @@ for time_point in times_to_analyze:
 	Plot heatmap
 	"""
 
-	ax_heatmap = fig.add_axes([0.3, 0.1, 0.6, 0.8])
+	cluster_len_1 = np.float32(len(cluster_name_dict["1"]))
+	cluster_len_2 = np.float32(len(cluster_name_dict["2"]))
+	cluster_len_3 = np.float32(len(cluster_name_dict["3"]))
+
+	frac_1 = cluster_len_1 / (cluster_len_1 + cluster_len_2 + cluster_len_3)
+	frac_2 = cluster_len_2 / (cluster_len_1 + cluster_len_2 + cluster_len_3)
+	frac_3 = cluster_len_3 / (cluster_len_1 + cluster_len_2 + cluster_len_3)
+
+	print frac_1, frac_2, frac_3
+	ax_heatmap_1 = fig.add_axes([0.3, 0.1+0.005, 0.6, 0.8*frac_1 - 0.01], frame_on = True)
+	ax_heatmap_2 = fig.add_axes([0.3, 0.1 +0.005+ 0.8*frac_1, 0.6 , 0.8*frac_2 - 0.01], frame_on = True)
+	ax_heatmap_3 = fig.add_axes([0.3, 0.1 +0.005+ 0.8*frac_1 + 0.8*frac_2, 0.6, 0.8*frac_3 - 0.01], frame_on = True)
+
 	index = Z['leaves']
 	genes_ordered = genes_matrix[index,:]
-	im = ax_heatmap.matshow(genes_ordered, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none')
-	fig.colorbar(im, ticks = [0, 20], orientation = 'vertical')
+	im = ax_heatmap_1.matshow(genes_ordered[0:cluster_len_1], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none')
+	im = ax_heatmap_2.matshow(genes_ordered[cluster_len_1:cluster_len_2], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none')
+	im = ax_heatmap_3.matshow(genes_ordered[cluster_len_2:], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none')
+
+	# fig.colorbar(im, ticks = [0, 20], orientation = 'vertical')
 
 	for i in xrange(genes_matrix.shape[1]):
 		print genes_to_plot[i]
-		ax_heatmap.text(i-.1, -6, '' + genes_to_plot[i], rotation = 270)
+		ax_heatmap_1.text(i-.1, -6, '' + genes_to_plot[i], rotation = 270)
 
-	ax_heatmap.set_title("300 min gene expression heatmap", y = 1.05)
-	ax_heatmap.set_yticks([])
-	ax_heatmap.set_xticks([])
+	ax_heatmap_3.set_title("300 min gene expression heatmap", y = 1.05)
+	ax_heatmap_1.set_yticks([])
+	ax_heatmap_1.set_xticks([])
+	ax_heatmap_2.set_yticks([])
+	ax_heatmap_2.set_xticks([])
+	ax_heatmap_3.set_yticks([])
+	ax_heatmap_3.set_xticks([])
 
 	plt.savefig("plots/trial_21_300min.pdf")
 

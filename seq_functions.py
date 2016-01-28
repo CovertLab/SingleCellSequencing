@@ -36,6 +36,10 @@ data = pyensembl.Genome(reference_name = 'GRCm38', gtf_path_or_url = 'ftp://ftp.
 
 """
 
+R = rpy2.robjects.r
+DTW = importr('dtw')
+DTWCLUST = importr('dtwclust')
+
 """
 Define functions
 """
@@ -862,5 +866,57 @@ class cell_object_rsem():
 
 		seq_data_kal.close()
 		seq_data_rsem.close()
+
+class smFISH_cell():
+	def __init__(self, cell_id = None, NC_ratio = None, norm_med = None, condition = None, position = None, smFISH_dataframe = None, cluster_dynamics_avg = None):
+		R = rpy2.robjects.r
+		DTW = importr('dtw')
+		DTWCLUST = importr('dtwclust')
+		
+		self.good_cell = 1
+		self.cell_id = cell_id
+		self.condition = condition
+		self.position = position
+		self.NC_ratio = NC_ratio
+		self.norm_med = norm_med
+
+		if np.sum(np.isnan(self.norm_med) > 0):
+			self.good_cell = 0
+
+		mRNA_count_loc = (smFISH_dataframe["Position"] == self.position) & (smFISH_dataframe["LiveCell_ID"] == self.cell_id)
+		if np.sum(mRNA_count_loc) == 1:
+			self.mRNA_count = smFISH_dataframe.loc[mRNA_count_loc, "mRNA count"].values[0]
+			self.mRNA_med_int = smFISH_dataframe.loc[mRNA_count_loc, "mRNA median intensity"].values[0]
+			self.mRNA_sum_int = smFISH_dataframe.loc[mRNA_count_loc, "mRNA sum intensity"].values[0]
+
+			self.target = smFISH_dataframe.loc[mRNA_count_loc, "Target"].values[0]
+		else:
+			self.good_cell = 0
+			self.mRNA_count = None
+			self.target = None
+
+		if cluster_dynamics_avg != None and self.good_cell == 1:
+			cluster_comparisons = []
+			for j in xrange(cluster_dynamics_avg.shape[0]):
+				alignment = R.SBD(self.norm_med, cluster_dynamics_avg[j,:], znorm = True)
+				cc = alignment.rx('dist')[0][0]
+				cluster_comparisons += [cc]
+			cluster_comparisons = np.array(cluster_comparisons)
+			self.clusterID = np.argmin(cluster_comparisons)
+		else:
+			self.clusterID = None
+
+def cleanAxis(ax):
+	ax.set_frame_on(False)
+	for label in ax.axes.get_xticklabels():
+		label.set_visible(False)
+	for label in ax.axes.get_yticklabels():
+		label.set_visible(False)
+	for tick in ax.axes.get_xticklines():
+		tick.set_visible(False)
+	for tick in ax.axes.get_yticklines():
+		tick.set_visible(False)
+	for spine in ax.spines.values():
+		spine.set_visible(False)
 
 

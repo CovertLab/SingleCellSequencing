@@ -92,7 +92,8 @@ all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 # list_of_genes = ["Saa3", "Il1f9", "Il6", "Csf3", "Gp49a"]
 # list_of_genes = ["Cxcl2", "Cxcl10", "Ccl20", "Tnfsf9", "Il1a"]
 # list_of_genes = ["Tnf", "Ccl4", "Il1b", "Cxcl3", "Il1f6", "Lif"]
-list_of_genes = ["Ccl3", "Ccl5"]
+# list_of_genes = ["Ccl3", "Ccl5"]
+list_of_genes = ["Zfp36", "Ccl3"]
 # list_of_genes = ["Prdx1", "Irg1"]
 """
 Analyze all the time points
@@ -401,7 +402,7 @@ for gene in list_of_genes:
 	counter += 1
 
 fig.tight_layout()
-file_name = "trial_23_cluster_2_rise.pdf"
+file_name = "trial_23_zfp.pdf"
 plt.savefig("plots/" + file_name)
 
 
