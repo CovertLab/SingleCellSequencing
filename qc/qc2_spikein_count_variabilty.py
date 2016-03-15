@@ -29,6 +29,8 @@ import matplotlib
 import cPickle as pickle
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+matplotlib.rcParams['pdf.fonttype'] = 42
+
 
 """
 Load all the cells

@@ -73,7 +73,7 @@ all_cell_file = 'all_cells_all_detected_genes_qc_w_jackpot.pkl'
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 
 # Determine which genes to look at
-genes_to_plot = ["Prdx1", "Ccl5", "Ccl3", "Saa3", "Il1f9"]
+genes_to_plot = ["Ccl5", "Ccl3", "Saa3", "Il1f9", "Prdx1"]
 
 """
 Analyze all the time points
@@ -137,7 +137,7 @@ for time_point in times_to_analyze:
 	Compute posterior FPM distribution for a given gene
 	"""
 	plt.clf()
-	fig, axes = plt.subplots(len(genes_to_plot) ,1, figsize = (10,10))
+	fig, axes = plt.subplots(len(genes_to_plot) ,1, figsize = (5,10))
 	counter = 0
 
 	for gene in genes_to_plot:

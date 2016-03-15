@@ -125,7 +125,7 @@ for j in xrange(len(cluster_id_list)):
 	cluster_dynamics[j,:] = temp
 
 colors = ['g', 'r', 'c','purple','yellow']
-np.savez('/scratch/PI/mcovert/dvanva/sequencing/smFISH/'+str(time_point[0])+"_cluster_avg_kshape.npz", cluster_dynamics_avg = cluster_dynamics)
+# np.savez('/scratch/PI/mcovert/dvanva/sequencing/smFISH/'+str(time_point[0])+"_cluster_avg_kshape.npz", cluster_dynamics_avg = cluster_dynamics)
 
 for j in xrange(len(cluster_id_list)):
 	
@@ -142,7 +142,7 @@ for j in xrange(len(cluster_id_list)):
 	plt.ylabel('Nuclear localization (au)', fontsize = 16)
 	plt.xlim([0, times[-1]])
 	plt.xticks([],  fontsize = 16)
-	plt.ylim([-0.25,1.05])
+	plt.ylim([-0.5,1.05])
 	plt.yticks([0,1],  fontsize = 16)
 	# plt.ylim([np.amin(cluster_dynamics_DBA)*1.05, np.amax(cluster_dynamics_DBA)*1.05])
 	# plt.yticks([np.amin(cluster_dynamics_DBA)*1.05, np.amax(cluster_dynamics_DBA)*1.05],  fontsize = 16)

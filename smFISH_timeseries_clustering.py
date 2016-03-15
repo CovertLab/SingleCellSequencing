@@ -86,13 +86,13 @@ for t in times:
 	"""
 
 	distance_matrix = np.zeros((number_of_cells, number_of_cells))
-	# for i in xrange(number_of_cells):
-	# 	print i
-	# 	for j in xrange(number_of_cells):
-	# 		alignment = R.SBD(dynamics_matrix[i,:], dynamics_matrix[j,:], znorm = True)
-	# 		distance_matrix[i,j] = alignment.rx('dist')[0][0]
+	for i in xrange(number_of_cells):
+		print i
+		for j in xrange(number_of_cells):
+			alignment = R.SBD(dynamics_matrix[i,:], dynamics_matrix[j,:], znorm = True)
+			distance_matrix[i,j] = alignment.rx('dist')[0][0]
 
-	# np.savez('/scratch/PI/mcovert/dvanva/sequencing/smFISH/'+str(t)+"_dynamics_distance_matrix_kshape.npz", distance_matrix = distance_matrix)
+	np.savez('/scratch/PI/mcovert/dvanva/sequencing/smFISH/'+str(t)+"_dynamics_distance_matrix_kshape.npz", distance_matrix = distance_matrix)
 	dynamics_load = np.load('/scratch/PI/mcovert/dvanva/sequencing/smFISH/'+str(t)+"_dynamics_distance_matrix_kshape.npz")
 	distance_matrix = dynamics_load['distance_matrix']
 	Y = sch.linkage(distance_matrix, method = 'ward')

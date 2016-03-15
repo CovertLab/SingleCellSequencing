@@ -29,6 +29,8 @@ import matplotlib
 matplotlib.use("Agg")
 import cPickle as pickle
 import matplotlib.pyplot as plt
+matplotlib.rcParams['pdf.fonttype'] = 42
+
 
 """
 Load all the cells
@@ -44,8 +46,8 @@ unmapped_list = []
 mapped_list = []
 
 for cell in all_cells:
-	mapped_list += [cell.num_mapped.item()]
-	unmapped_list += [cell.num_unmapped.item()]
+	mapped_list += [cell.num_mapped]
+	unmapped_list += [cell.num_unmapped]
 
 mapped = np.array(mapped_list)/2
 unmapped = np.array(unmapped_list)/2
@@ -56,4 +58,4 @@ plt.xlabel('Number of reads')
 plt.ylabel('Number of cells')
 plt.title('Number of reads mapping to the transcriptome')
 plt.legend()
-plt.savefig("qc1_num_mapped_histogram.png")
+plt.savefig("qc1_num_mapped_histogram.pdf")

@@ -16,7 +16,7 @@ import numpy
 import scipy
 import scipy.io as sio 
 import pyensembl
-import h5py
+# import h5py
 import pandas as pd
 import numpy as np
 import scipy.cluster.hierarchy as sch
@@ -868,7 +868,7 @@ class cell_object_rsem():
 		seq_data_rsem.close()
 
 class smFISH_cell():
-	def __init__(self, cell_id = None, NC_ratio = None, norm_med = None, condition = None, position = None, smFISH_dataframe = None, cluster_dynamics_avg = None):
+	def __init__(self, cell_id = None, NC_ratio = None, norm_med = None, condition = None, position = None, counts = None, medint = None, summed = None, cyto_fluo = None, cluster_dynamics_avg = None, clusterID = None, smFISH_dataframe = None):
 		R = rpy2.robjects.r
 		DTW = importr('dtw')
 		DTWCLUST = importr('dtwclust')
@@ -879,21 +879,21 @@ class smFISH_cell():
 		self.position = position
 		self.NC_ratio = NC_ratio
 		self.norm_med = norm_med
+		self.mRNA_count = counts
+		self.mRNA_med_int = medint
+		self.mRNA_summed = summed
+		self.cyto_fluo = cyto_fluo
 
 		if np.sum(np.isnan(self.norm_med) > 0):
 			self.good_cell = 0
 
-		mRNA_count_loc = (smFISH_dataframe["Position"] == self.position) & (smFISH_dataframe["LiveCell_ID"] == self.cell_id)
-		if np.sum(mRNA_count_loc) == 1:
-			self.mRNA_count = smFISH_dataframe.loc[mRNA_count_loc, "mRNA count"].values[0]
-			self.mRNA_med_int = smFISH_dataframe.loc[mRNA_count_loc, "mRNA median intensity"].values[0]
-			self.mRNA_sum_int = smFISH_dataframe.loc[mRNA_count_loc, "mRNA sum intensity"].values[0]
+		mRNA_count_loc = (smFISH_dataframe["Position"] == "Pos" + str(np.int(self.position)))
 
-			self.target = smFISH_dataframe.loc[mRNA_count_loc, "Target"].values[0]
-		else:
+		self.target = smFISH_dataframe.loc[mRNA_count_loc, "Target"].values[0]
+		self.stimulus = smFISH_dataframe.loc[mRNA_count_loc, "Stimulus"].values[0]
+
+		if fnmatch.fnmatch(self.stimulus,"*TNF*") == True or fnmatch.fnmatch(self.stimulus, "*brefeldin*") == True:
 			self.good_cell = 0
-			self.mRNA_count = None
-			self.target = None
 
 		if cluster_dynamics_avg != None and self.good_cell == 1:
 			cluster_comparisons = []
@@ -905,6 +905,93 @@ class smFISH_cell():
 			self.clusterID = np.argmin(cluster_comparisons)
 		else:
 			self.clusterID = None
+
+		if clusterID != None:
+			self.clusterID = clusterID
+
+class smFISH_cell_minimal():
+	def __init__(self, norm_med = None, cluster_dynamics_avg = None, clusterID = None):
+		R = rpy2.robjects.r
+		DTW = importr('dtw')
+		DTWCLUST = importr('dtwclust')
+		self.good_cell = 1
+		self.norm_med = norm_med
+
+		if cluster_dynamics_avg != None and self.good_cell == 1:
+			cluster_comparisons = []
+			for j in xrange(cluster_dynamics_avg.shape[0]):
+				alignment = R.SBD(self.norm_med, cluster_dynamics_avg[j,:], znorm = True)
+				cc = alignment.rx('dist')[0][0]
+				cluster_comparisons += [cc]
+			cluster_comparisons = np.array(cluster_comparisons)
+			self.clusterID = np.argmin(cluster_comparisons)
+		else:
+			self.clusterID = None
+
+		if clusterID != None:
+			self.clusterID = clusterID
+
+class smFISH_stim_cell():
+	def __init__(self, cell_id = None, stimulus_condition = None, NC_ratio = None, norm_med = None, condition = None, position = None, counts = None, medint = None, summed = None, cyto_fluo = None, cluster_dynamics_avg = None, clusterID = None, smFISH_dataframe = None):
+		R = rpy2.robjects.r
+		DTW = importr('dtw')
+		DTWCLUST = importr('dtwclust')
+		
+		self.good_cell = 1
+		self.cell_id = cell_id
+		self.condition = condition
+		self.position = position
+		self.NC_ratio = NC_ratio
+		self.norm_med = norm_med
+		self.mRNA_count = counts
+		self.mRNA_med_int = medint
+		self.mRNA_summed = summed
+		self.cyto_fluo = cyto_fluo
+		self.stimulus_condition = stimulus_condition
+
+		if np.sum(np.isnan(self.norm_med) > 0):
+			self.good_cell = 0
+
+		mRNA_count_loc = (smFISH_dataframe["Position"] == "Pos" + str(np.int(self.position)))
+
+
+		# Uncomment for brefeldin expt
+		if self.position in [0,1,2,3,48,49,50,51,52,53,54,55,96,97,98,99]:
+			self.good_cell = 0
+
+		# Uncomment for sTNFR expt
+		# if self.position in [80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103]:
+			# self.good_cell = 0
+
+		if np.sum(mRNA_count_loc) == 1:
+			self.stimulus = smFISH_dataframe.loc[mRNA_count_loc, "Stimulus"].values[0]
+			# self.target = smFISH_dataframe.loc[mRNA_count_loc, "Target"].values[0]
+
+		else:
+			self.stimulus = ""
+
+		score = 0
+		for cond in self.stimulus_condition:
+			if fnmatch.fnmatch(self.stimulus, cond) == True:
+				score += 1
+
+		if score == 0:
+			self.good_cell = 0
+
+		if cluster_dynamics_avg != None and self.good_cell == 1:
+			cluster_comparisons = []
+			for j in xrange(cluster_dynamics_avg.shape[0]):
+				alignment = R.SBD(self.norm_med, cluster_dynamics_avg[j,:], znorm = True)
+				cc = alignment.rx('dist')[0][0]
+				cluster_comparisons += [cc]
+			cluster_comparisons = np.array(cluster_comparisons)
+			self.clusterID = np.argmin(cluster_comparisons)
+		else:
+			self.clusterID = None
+
+		if clusterID != None:
+			self.clusterID = clusterID
+
 
 def cleanAxis(ax):
 	ax.set_frame_on(False)
