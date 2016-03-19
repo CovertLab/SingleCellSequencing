@@ -48,6 +48,23 @@ from rpy2.robjects.vectors import DataFrame as RDataFrame
 from rpy2 import rinterface
 from rpy2.robjects import conversion
 
+def computeMI(x, y):
+    sum_mi = 0.0
+    x_value_list = np.unique(x)
+    y_value_list = np.unique(y)
+    Px = np.array([ len(x[x==xval])/float(len(x)) for xval in x_value_list ]) #P(x)
+    Py = np.array([ len(y[y==yval])/float(len(y)) for yval in y_value_list ]) #P(y)
+    for i in xrange(len(x_value_list)):
+        if Px[i] ==0.:
+            continue
+        sy = y[x == x_value_list[i]]
+        if len(sy)== 0:
+            continue
+        pxy = np.array([len(sy[sy==yval])/float(len(y))  for yval in y_value_list]) #p(x,y)
+        t = pxy[Py>0.]/Py[Py>0.] /Px[i] # log(P(x,y)/( P(x)*P(y))
+        sum_mi += sum(pxy[t>0]*np.log2( t[t>0]) ) # sum ( P(x,y)* log(P(x,y)/( P(x)*P(y)) )
+    return sum_mi
+
 @conversion.py2ro.register(pd.DataFrame)
 def py2ro_pandasdataframe(obj):
     ri_dataf = conversion.py2ri(obj)
@@ -76,8 +93,9 @@ list_of_all_genes = list(r("rownames(counts_data_int)"))
 # list_of_genes = ['3110043O21Rik', 'A430078G23Rik', 'AC102815.1', 'Aars', 'Acat2', 'Acot9', 'Actg1', 'Adh7', 'Adora2b', 'Adrm1', 'Afp', 'Akna', 'Akr1a1', 'Akr1b3', 'Akr1b8', 'Alas1', 'Ampd3', 'Anxa5', 'Anxa7', 'Areg', 'Arg2', 'Arih1', 'Arl14ep', 'Arl4a', 'Arl5b', 'Arl5c', 'Asns', 'Atf3', 'Atf4', 'Atp6v0b', 'BC028528', 'Bcat1', 'Bcl10', 'Bcl2a1b', 'Bcl2a1d', 'Bcl2l11', 'Bcl6b', 'Birc3', 'Blcap', 'Blvrb', 'Brd2', 'Brd4', 'Btg2', 'Bud31', 'C130026I21Rik', 'C920009B18Rik', 'Calcrl', 'Carhsp1', 'Cat', 'Ccdc8', 'Ccl2', 'Ccl20', 'Ccl3', 'Ccl4', 'Ccl5', 'Ccl9', 'Ccr3', 'Ccrl2', 'Cd14', 'Cd247', 'Cd40', 'Cd74', 'Cd83', 'Cdc42ep2', 'Cdc42ep4', 'Cdk18', 'Cdk5r1', 'Cdkn1a', 'Cebpd', 'Cfap61', 'Cflar', 'Chac1', 'Chordc1', 'Ciart', 'Cish', 'Cited2', 'Clec4d', 'Clec4e', 'Clic4', 'Cndp2', 'Creg1', 'Csf1', 'Csf3', 'Csrnp1', 'Cth', 'Ctsd', 'Cxcl10', 'Cxcl16', 'Cxcl2', 'Cxcl3', 'Cyb5a', 'Cybb', 'Cyp51', 'Dcbld2', 'Dcstamp', 'Ddit3', 'Ddx28', 'Dhrs3', 'Dnaja1', 'Dnajb1', 'Dnajb2', 'Dnajb4', 'Dnajb9', 'Dnmt3l', 'Dpep2', 'Dpp7', 'Dtx4', 'Dusp1', 'Dusp16', 'Dusp2', 'Dusp5', 'Dusp8', 'Dynll1', 'Ebi3', 'Eef1e1', 'Egr1', 'Egr2', 'Ehd1', 'Eif1', 'Eif3c', 'Eif4ebp1', 'Eif5', 'Ell2', 'Ercc1', 'Errfi1', 'Esd', 'Ets2', 'Evi2a', 'Exoc3l4', 'Fabp4', 'Fam53c', 'Fas', 'Fbxo15', 'Fbxo33', 'Fdft1', 'Fdps', 'Fgr', 'Flrt3', 'Fosl1', 'Fth1', 'Ftl1', 'Gabarap', 'Gabarapl1', 'Gadd45b', 'Galnt3', 'Gars', 'Gas2l3', 'Gbp2', 'Gch1', 'Gclm', 'Gdpd1', 'Gem', 'Ghitm', 'Glipr1', 'Glrx', 'Gm10116', 'Gm10718', 'Gm10800', 'Gm11425', 'Gm11427', 'Gm13502', 'Gm15459', 'Gm1821', 'Gm18445', 'Gm29013', 'Gm4832', 'Gm5526', 'Gm8818', 'Gm8995', 'Gm9687', 'Gm9938', 'Gmfb', 'Gp49a', 'Gpatch11', 'Gpr132', 'Gpr84', 'Gramd1b', 'Gsap', 'Gspt1', 'Gsta1', 'Gtf2b', 'H2-Q4', 'H2-Q7', 'H60b', 'Hax1', 'Hcar2', 'Hdc', 'Herpud1', 'Hilpda', 'Hmgcr', 'Hmgcs1', 'Hmox1', 'Hsd17b7', 'Hsp90aa1', 'Hsp90ab1', 'Hspa1b', 'Hspa8', 'Hsph1', 'Htatip2', 'Icam1', 'Id1', 'Id3', 'Idi1', 'Ier3', 'Ier5', 'Ifih1', 'Ifrd1', 'Igsf3', 'Igsf6', 'Il18rap', 'Il1a', 'Il1b', 'Il1f6', 'Il1f9', 'Il1rn', 'Il27', 'Il2rg', 'Il4i1', 'Il6', 'Il7', 'Impact', 'Insig1', 'Ipo13', 'Irf1', 'Irg1', 'Isg15', 'Itga5', 'Jag1', 'Jak2', 'Jun', 'Junb', 'Kansl1l', 'Kcnj2', 'Kctd12', 'Kdm6b', 'Kif3c', 'Klf6', 'Kpna4', 'Lamc2', 'Layn', 'Lcn2', 'Ldlr', 'Lif', 'Lilrb4', 'Litaf', 'Lpar1', 'Lpin1', 'Lss', 'Mad2l1bp', 'Maff', 'Malt1', 'Map1b', 'Map1lc3b', 'Mapk6', 'Marcks', 'Marcksl1', 'Mcl1', 'Med10', 'Mettl4', 'Mitf', 'Mllt11', 'Mmp13', 'Mndal', 'Mrpl52', 'Msantd3', 'Msmo1', 'Mt1', 'Mt2', 'Mthfd2', 'Mtmr7', 'Mvd', 'Nabp1', 'Narf', 'Nars', 'Nfe2l1', 'Nfil3', 'Nfkb1', 'Nfkb2', 'Nfkbia', 'Nfkbib', 'Nfkbid', 'Nfkbie', 'Nfkbiz', 'Ninj1', 'Nlrp3', 'Npnt', 'Nqo1', 'Nr4a3', 'Nsdhl', 'Nub1', 'Nupr1', 'Oasl1', 'Odc1', 'Oser1', 'Osgin1', 'Osgin2', 'P2rx4', 'Parp3', 'Pcdh15', 'Pdcd1', 'Pde4b', 'Pdgfb', 'Pdlim7', 'Pdp2', 'Pea15a', 'Pef1', 'Peli1', 'Pgd', 'Phlda1', 'Pik3r5', 'Pim1', 'Pinx1', 'Pla2g4e', 'Plagl2', 'Plaur', 'Plek', 'Plekhm3', 'Plekho2', 'Plin2', 'Plk2', 'Plk3', 'Plscr1', 'Pmaip1', 'Pmvk', 'Ppp1r11', 'Ppp1r15a', 'Ppp4r2', 'Prdx1', 'Prdx5', 'Prdx6', 'Prkg2', 'Procr', 'Prr13', 'Psmb6', 'Psmc2', 'Psmc6', 'Psmd10', 'Psmd11', 'Psmd7', 'Psmd8', 'Psph', 'Ptger2', 'Ptgr1', 'Ptgs2', 'Ptpn14', 'Ptpre', 'Pvr', 'RP23-172K2.12', 'RP23-57A17.2', 'Rab11fip1', 'Rab32', 'Rab8b', 'Rap1b', 'Rap2b', 'Rasgef1b', 'Rassf4', 'Rc3h1', 'Rdh11', 'Rel', 'Relb', 'Rffl', 'Rgs1', 'Rgs16', 'Rhbdf2', 'Rhob', 'Rhoc', 'Rhof', 'Riok3', 'Rnf19b', 'Rrs1', 'Saa3', 'Sars', 'Sat1', 'Sc5d', 'Sdc4', 'Sde2', 'Sele', 'Selk', 'Sept11', 'Serpinb1b', 'Serpinb2', 'Serpinb9b', 'Serpinb9e', 'Serpine1', 'Sertad1', 'Sertad2', 'Sgk1', 'Skil', 'Slc11a1', 'Slc15a3', 'Slc17a6', 'Slc1a4', 'Slc25a33', 'Slc25a37', 'Slc2a6', 'Slc39a1', 'Slc3a2', 'Slc48a1', 'Slc4a7', 'Slc6a9', 'Slc7a11', 'Slc7a6os', 'Slc9a4', 'Slfn10-ps', 'Slfn2', 'Slpi', 'Snx10', 'Socs3', 'Socs5', 'Sod2', 'Spp1', 'Spryd7', 'Spty2d1', 'Sqrdl', 'Sqstm1', 'Srfbp1', 'Srgn', 'Srxn1', 'Stap1', 'Stard4', 'Stip1', 'Stk40', 'Stx11', 'Stx6', 'Taf13', 'Taf7', 'Tank', 'Tars', 'Tbpl1', 'Tbrg1', 'Tfec', 'Tgif1', 'Tgoln1', 'Tiparp', 'Tlcd2', 'Tlr2', 'Tma16', 'Tmbim6', 'Tmem171', 'Tmem41b', 'Tmsb10', 'Tnf', 'Tnfaip2', 'Tnfaip3', 'Tnfaip8l2', 'Tnfrsf10b', 'Tnfrsf1b', 'Tnfsf4', 'Tnfsf9', 'Tnip1', 'Tnip3', 'Top1', 'Tox4', 'Tpbg', 'Tpm4', 'Traf1', 'Treml4', 'Trex1', 'Trib1', 'Trim13', 'Trpv2', 'Tslp', 'Tubb2a', 'Txndc9', 'Txnrd1', 'Uba6', 'Ubb', 'Ubc', 'Ube2h', 'Ubxn4', 'Unc80', 'Vegfa', 'Vmn2r90', 'Wsb1', 'Ypel5', 'Zbtb32', 'Zc3h12a', 'Zc3h12c', 'Zc3hav1', 'Zfand2a', 'Zfand5', 'Zfp330', 'Zfp36', 'Zfp617', 'Zfp622', 'Znrf1', 'Zswim4', 'Zwint', 'Zyx']
 # list_of_genes = ['3110043O21Rik', 'Afp', 'Akr1a1', 'Akr1b3', 'Akr1b8', 'Alas1', 'Ampd3', 'Asns', 'Atf3', 'Bcl2a1b', 'Bcl2a1d', 'Bcl2l11', 'Blvrb', 'Btg2', 'Calcrl', 'Ccl20', 'Ccl3', 'Ccl4', 'Ccl5', 'Ccrl2', 'Cd14', 'Cd83', 'Cdkn1a', 'Cish', 'Cited2', 'Clec4d', 'Clec4e', 'Csf3', 'Csrnp1', 'Cxcl10', 'Cxcl2', 'Cxcl3', 'Cyb5a', 'Cyp51', 'Ddit3', 'Dnaja1', 'Dnmt3l', 'Dusp16', 'Dusp2', 'Dusp5', 'Egr1', 'Ehd1', 'Eif1', 'Errfi1', 'Esd', 'Fabp4', 'Fas', 'Fbxo15', 'Fdft1', 'Fdps', 'Gadd45b', 'Glipr1', 'Gm15459', 'Gm18445', 'Gm8818', 'Gp49a', 'Gpr84', 'Hax1', 'Herpud1', 'Hmgcs1', 'Hmox1', 'Hsp90aa1', 'Hspa8', 'Icam1', 'Id3', 'Idi1', 'Ier3', 'Il1a', 'Il1b', 'Il1f9', 'Il1rn', 'Il27', 'Insig1', 'Irg1', 'Jun', 'Junb', 'Kdm6b', 'Lif', 'Lilrb4', 'Lpar1', 'Malt1', 'Map1b', 'Marcksl1', 'Mcl1', 'Mt1', 'Mt2', 'Nabp1', 'Nars', 'Nfkb1', 'Nfkbia', 'Nfkbie', 'Nfkbiz', 'Nlrp3', 'Nupr1', 'Oasl1', 'Odc1', 'Pde4b', 'Pdgfb', 'Phlda1', 'Pim1', 'Plaur', 'Plek', 'Plekho2', 'Plk2', 'Plk3', 'Pmaip1', 'Ppp1r15a', 'Prdx1', 'Procr', 'Prr13', 'Ptgs2', 'Ptpn14', 'RP23-57A17.2', 'Rap2b', 'Rasgef1b', 'Rassf4', 'Rel', 'Rhoc', 'Saa3', 'Sars', 'Sat1', 'Sc5d', 'Sdc4', 'Sde2', 'Skil', 'Slc3a2', 'Slc48a1', 'Slc4a7', 'Slc7a11', 'Slfn2', 'Slpi', 'Sod2', 'Spp1', 'Spryd7', 'Sqstm1', 'Srgn', 'Srxn1', 'Stap1', 'Stx11', 'Tfec', 'Tlcd2', 'Tmem171', 'Tnf', 'Tnfaip2', 'Tnfaip3', 'Tnfaip8l2', 'Tnfsf9', 'Tnip1', 'Traf1', 'Txnrd1', 'Ubb', 'Ubc', 'Ypel5', 'Zc3h12c', 'Zfand2a', 'Zfp36']
 # list_of_genes = ['Afp', 'Akr1b8', 'Atf3', 'Bcl2a1b', 'Bcl2a1d', 'Bcl2l11', 'Blvrb', 'Btg2', 'Calcrl', 'Ccl3', 'Ccl4', 'Ccl5', 'Cd14', 'Cd83', 'Cdkn1a', 'Cish', 'Cited2', 'Clec4e', 'Csf3', 'Cxcl10', 'Cxcl2', 'Cxcl3', 'Cyp51', 'Ddit3', 'Dnaja1', 'Dnmt3l', 'Dusp5', 'Egr1', 'Ehd1', 'Eif1', 'Errfi1', 'Esd', 'Fas', 'Fdft1', 'Gadd45b', 'Glipr1', 'Gm15459', 'Gm18445', 'Gp49a', 'Gpr84', 'Hmgcs1', 'Hmox1', 'Hsp90aa1', 'Hspa8', 'Icam1', 'Idi1', 'Ier3', 'Il1a', 'Il1b', 'Il1f9', 'Il27', 'Insig1', 'Irg1', 'Jun', 'Kdm6b', 'Lif', 'Lilrb4', 'Lpar1', 'Malt1', 'Marcksl1', 'Mt2', 'Nars', 'Nfkb1', 'Nfkbia', 'Nfkbie', 'Nfkbiz', 'Nlrp3', 'Nupr1', 'Oasl1', 'Odc1', 'Pde4b', 'Phlda1', 'Pim1', 'Plaur', 'Plek', 'Plekho2', 'Plk2', 'Plk3', 'Ppp1r15a', 'Prdx1', 'Procr', 'Prr13', 'Ptgs2', 'Ptpn14', 'Rap2b', 'Rasgef1b', 'Rassf4', 'Rel', 'Rhoc', 'Saa3', 'Sat1', 'Sc5d', 'Sdc4', 'Slc3a2', 'Slc48a1', 'Slc7a11', 'Slfn2', 'Slpi', 'Sod2', 'Spp1', 'Sqstm1', 'Srgn', 'Srxn1', 'Stap1', 'Stx11', 'Tfec', 'Tmem171', 'Tnf', 'Tnfaip2', 'Tnfaip3', 'Tnfaip8l2', 'Tnfsf9', 'Traf1', 'Txnrd1', 'Ubb', 'Ubc', 'Zc3h12c', 'Zfp36']
-list_of_genes = ['Nupr1', 'Cxcl10', 'Ccl5', 'Il27', 'Lilrb4', 'Oasl1', 'Icam1', 'Nfkbie', 'Irg1', 'Marcksl1', 'Slfn2', 'Gp49a', 'Spp1', 'Ccl3', 'Ccl4', 'Plaur', 'Srgn', 'Pim1', 'Traf1', 'Btg2', 'Ier3', 'Phlda1', 'Kdm6b', 'Nfkbia', 'Nfkbiz', 'Tfec', 'Malt1', 'Nlrp3', 'Sdc4', 'Cd83', 'Tnfaip3', 'Il1a', 'Il1b', 'Sat1', 'Cxcl3', 'Saa3', 'Sod2', 'Csf3', 'Cxcl2', 'Tnf', 'Il1f9', 'Tnfsf9']
-
+# list_of_genes = ['Nupr1', 'Cxcl10', 'Ccl5', 'Il27', 'Lilrb4', 'Oasl1', 'Icam1', 'Nfkbie', 'Irg1', 'Marcksl1', 'Slfn2', 'Gp49a', 'Spp1', 'Ccl3', 'Ccl4', 'Plaur', 'Srgn', 'Pim1', 'Traf1', 'Btg2', 'Ier3', 'Phlda1', 'Kdm6b', 'Nfkbia', 'Nfkbiz', 'Tfec', 'Malt1', 'Nlrp3', 'Sdc4', 'Cd83', 'Tnfaip3', 'Il1a', 'Il1b', 'Sat1', 'Cxcl3', 'Saa3', 'Sod2', 'Csf3', 'Cxcl2', 'Tnf', 'Il1f9', 'Tnfsf9']
+list_of_genes = ['Ccl2', 'Ccl3', 'Ccl4', 'Ccl5', 'Ccl6', 'Ccl7', 'Ccl9', 'Ccl11', 'Ccl17', 'Ccl20', 'Ccl22', 'Ccl24', 'Ccl25', 'Ccl28']
+list_of_genes += ['Cxcl1', 'Cxcl2', 'Cxcl3', 'Cxcl5', 'Cxcl9', 'Cxcl10', 'Cxcl11', 'Cxcl14', 'Cxcl15', 'Cxcl16', 'Cxcl17']
 
 # r("write.csv(exp(o.fpm), file = '/scratch/PI/mcovert/dvanva/sequencing/fpms.csv')")
 
@@ -92,11 +110,11 @@ all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 all_cells = []
 longest_time = 0
 
-time_point = 300
+time_point = 150
 cell_names = []
 for cell in all_cells_total:
-	# if cell.time_point == 75 or cell.time_point == 300 or cell.time_point == 150 and cell.condition == 'Stim':
-	if cell.time_point == 75 and cell.condition == 'Stim':
+	if cell.time_point == 75 or cell.time_point == 300 or cell.time_point == 150 and cell.condition == 'Stim':
+	# if cell.time_point == 300 and cell.condition == 'Stim':
 
 		longest_time = np.amax([longest_time, cell.NFkB_dynamics.shape[0]])
 		# if cell.id in fpm.index.tolist():
@@ -147,10 +165,11 @@ counter1 = 0
 for gene1 in list_of_genes:
 	counter2 = 0
 	for gene2 in list_of_genes:
-		gene1_array = reduced_fpm.loc[gene1,:]
-		gene2_array = reduced_fpm.loc[gene2,:]
+		gene1_array = reduced_logfpm.loc[gene1,:]
+		gene2_array = reduced_logfpm.loc[gene2,:]
+		pear = computeMI(gene1_array > 0, gene2_array > 0)
 
-		pear = scipy.stats.pearsonr(gene1_array, gene2_array)[0]
+		# pear = scipy.stats.pearsonr(gene1_array, gene2_array)[0]
 		
 		if np.isnan(pear) == 1:
 			pear = 0
@@ -161,6 +180,7 @@ for gene1 in list_of_genes:
 		counter2 += 1
 	counter1 += 1
 
+print corr_matrix
 Y = sch.linkage(corr_matrix, method = 'ward')
 Z = sch.dendrogram(Y, orientation = 'right', color_threshold = 0.5*np.amax(Y[:,2]))
 index = Z['leaves']
@@ -171,7 +191,7 @@ list_of_genes_ordered = [list_of_genes[i] for i in index]
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
-ax.matshow(corr_ordered, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none', vmin = 0, vmax = 1)
+ax.matshow(corr_ordered, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none') #, vmin = -1, vmax = 1)
 ticks = np.arange(0,corr_ordered.shape[0],1)
 ax.xaxis.set_ticks_position('bottom')
 ax.set_xticks(ticks)
@@ -198,10 +218,10 @@ Produce correlation maps for different cluster_list
 # 	for gene1 in list_of_genes:
 # 		counter2 = 0
 # 		for gene2 in list_of_genes:
-# 			gene1_array = 2**reduced_logfpm.loc[gene1,:]+1
-# 			gene2_array = 2**reduced_logfpm.loc[gene2,:]+1
-
-# 			pear = scipy.stats.pearsonr(gene1_array, gene2_array)[0]
+# 			gene1_array = reduced_logfpm.loc[gene1,:]
+# 			gene2_array = reduced_logfpm.loc[gene2,:]
+# 			pear = computeMI(gene1_array > 0, gene2_array > 0)
+# 			# pear = scipy.stats.pearsonr(gene1_array, gene2_array)[0]
 
 # 			if np.isnan(pear) == 1:
 # 				pear = 0
@@ -211,30 +231,30 @@ Produce correlation maps for different cluster_list
 # 			counter2 += 1
 # 		counter1 += 1
 
-	# corr1 = corr_matrix[index, :]
-	# corr_ordered = corr1[:,index]
+# 	corr1 = corr_matrix[index, :]
+# 	corr_ordered = corr1[:,index]
 
-	# Y = sch.linkage(corr_matrix, method = 'ward')
-	# Z = sch.dendrogram(Y, orientation = 'right', color_threshold = 0.5*np.amax(Y[:,2]))
-	# index = Z['leaves']
-	# corr1 = corr_matrix[index, :]
-	# corr_ordered = corr1[:,index]
+# 	Y = sch.linkage(corr_matrix, method = 'ward')
+# 	Z = sch.dendrogram(Y, orientation = 'right', color_threshold = 0.5*np.amax(Y[:,2]))
+# 	index = Z['leaves']
+# 	corr1 = corr_matrix[index, :]
+# 	corr_ordered = corr1[:,index]
 
-	# plt.clf()
+# 	plt.clf()
 
-	# fig = plt.figure()
-	# ax = fig.add_subplot(111)
+# 	fig = plt.figure()
+# 	ax = fig.add_subplot(111)
 
-	# ax.matshow(corr_ordered, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none', vmin = -1, vmax = 1)
-	# ticks = np.arange(0,corr_ordered.shape[0],1)
-	# ax.xaxis.set_ticks_position('bottom')
-	# ax.set_xticks(ticks)
-	# ax.set_yticks(ticks)
-	# ax.set_xticklabels(list_of_genes_ordered, fontsize = 3, rotation = 90)
-	# ax.set_yticklabels(list_of_genes_ordered, fontsize = 3)
-	# ax.tick_params(width = 0, length = 0)
+# 	ax.matshow(corr_ordered, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none')#, vmin = -1, vmax = 1)
+# 	ticks = np.arange(0,corr_ordered.shape[0],1)
+# 	ax.xaxis.set_ticks_position('bottom')
+# 	ax.set_xticks(ticks)
+# 	ax.set_yticks(ticks)
+# 	ax.set_xticklabels(list_of_genes_ordered, fontsize = 3, rotation = 90)
+# 	ax.set_yticklabels(list_of_genes_ordered, fontsize = 3)
+# 	ax.tick_params(width = 0, length = 0)
 
-	# plt.savefig("plots/trial_28_" + str(time_point) + "min_cluster" + clust + ".pdf")
+# 	plt.savefig("plots/trial_28_" + str(time_point) + "min_cluster" + clust + ".pdf")
 
 
 # fpm = np.float32(pandas2ri.ri2py(r("exp(o.fpm)")))

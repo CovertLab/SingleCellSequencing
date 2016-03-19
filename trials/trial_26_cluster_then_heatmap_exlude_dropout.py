@@ -82,7 +82,7 @@ all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 # genes_to_plot = ['Wrb', 'Cxcl3', 'Tnfaip3', 'Tnfaip2', 'Blvrb', 'Nfatc1', 'Nfkbiz', 'Phf11d', 'Fas', 'Gpx1', 'Ccnd1', 'Rnf213', 'Marcksl1', 'Abcg1', 'Gm8818', 'Nlrp3', 'Rrm2', 'Mbnl1', 'Ptpn14', 'Odc1', 'Ptgs2', 'Ddit3', 'Cxcl10', 'Ly86', 'Ier3', 'Cd14', 'Rel', 'Prkg2', 'Afp', 'Btg2', 'Gm18445', 'Sdc4', 'Tnfsf9', 'Prr14l', 'Il27', 'Tk1', 'Angpt2', 'Tmem171', 'Ccl3', 'Ccl4', 'Sqstm1', 'Cd83', 'Slc7a11', 'Oasl1', 'Hsp90aa1', 'Pde4b', 'Rasgrp3', 'Calcrl', 'Egr1', 'Stx11', 'Colec12', 'Gmnn', 'Gpr84', 'Cxcl2', 'Sod2', 'Mt2', 'Serpinb8', 'Srxn1', 'Phlda1', 'Bcl2a1d', 'Traf1', 'Pim1', 'Il1f9', 'Prdx1', 'Procr', 'Hmgcs1', 'AI607873', 'Bcl2l11', 'Irg1', 'Saa3', 'Tnf', 'Hdc', 'Atf3', 'Errfi1', 'Lif', 'Sat1', 'Plaur', 'Hmox1', 'Id1', 'Mef2c', 'Icam1', 'Slfn2', 'Map1b', 'Lilrb4', 'Clec4e', 'Nfkbia', 'Csf3', 'Akr1b8', 'Emp1', 'Srgn', 'Zc3h12c', 'Slpi', 'Rasgef1b', 'Plk3', 'Plk2', 'Rassf4', 'Stap1', 'Kdm6b', 'Il1b', 'Gp49a', 'Malt1', 'Nabp1', 'Kif14', 'Rab31', 'Ppp1r15a', 'Mtss1', 'Ccl5']
 # add_genes = ['Nfkbie', 'Il6', 'Ccl20', 'Il1a', 'Il1f6', 'Zfp850']
 
-genes_to_plot = ['Ccl5', 'Cxcl10', 'Irg1', 'Ifnb1']
+genes_to_plot = ['Ccl5', 'Cxcl10', 'Il27', 'Nupr1', 'Lilrb4', 'Oasl1']
 # genes_to_plot = list(set(genes_to_plot)|set(add_genes))
 genes_to_plot = sorted(genes_to_plot)
 
@@ -90,7 +90,7 @@ genes_to_plot = sorted(genes_to_plot)
 Analyze all the time points
 """
 
-times_to_analyze = [75]
+times_to_analyze = [150]
 for time_point in times_to_analyze:
 
 	print "Analyzing " + str(time_point) + " minute time point"
@@ -212,7 +212,7 @@ for time_point in times_to_analyze:
 		# print new_gene_list[i]
 		ax_heatmap_1.text(i-.6, -5, '' + new_gene_list[i], rotation = 270, fontsize = 3)
 
-	ax_heatmap_2.set_title("300 min gene expression heatmap", y = 1.05)
+	ax_heatmap_2.set_title("150 min gene expression heatmap", y = 1.05)
 	ax_heatmap_1.set_yticks([])
 	ax_heatmap_1.set_xticks([])
 	ax_heatmap_2.set_yticks([])
@@ -220,7 +220,7 @@ for time_point in times_to_analyze:
 	ax_heatmap_3.set_yticks([])
 	ax_heatmap_3.set_xticks([])
 
-	plt.savefig("plots/trial_26_75min_irf3_genes.pdf")
+	plt.savefig("plots/trial_26_150min_irf3_genes.pdf")
 
 	print new_gene_list
 
