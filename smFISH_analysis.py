@@ -21,7 +21,7 @@ import numpy
 import scipy
 import scipy.io as sio 
 import pyensembl
-import h5py
+# import h5py
 import pandas as pd
 import numpy as np
 import scipy.cluster.hierarchy as sch
@@ -36,7 +36,7 @@ from scipy.ndimage.filters import median_filter as med_filt
 import matplotlib.ticker as mtick
 from scipy import stats
 import scikits.bootstrap as bootstrap
-import seaborn as sns
+# import seaborn as sns
 
 mpl.use("Agg")
 mpl.rcParams['pdf.fonttype'] = 42
@@ -136,7 +136,7 @@ for time in times:
 
 		for cell in good_cells:
 			if cell.target == target:
-				value = cell.mRNA_count
+				value = cell.cyto_fluo
 
 				if cell.clusterID == None:
 					if np.isnan(value) == False:
@@ -198,7 +198,7 @@ for target in targets:
 		axes.flatten()[counter].set_ylabel("Total cytoplasmic intensity (au)", fontsize = 20)
 		axes.flatten()[counter].tick_params(axis = "both", which = "major", labelsize = 16)
 
-		# axes.flatten()[counter].yaxis.set_major_formatter(mtick.FormatStrFormatter('%.1e'))
+		# axes.flatten()[counter].yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
 		axes.flatten()[counter].yaxis.major.formatter._useMathText = True
 	counter += 1
 fig.tight_layout()
@@ -208,7 +208,7 @@ fig.tight_layout()
 # 	print "Std : " + str(np.std(master_dict["300"]["Ccl5"][key]))
 # 	print "Std err: " + str(sem(master_dict["300"]["Ccl5"][key]))
 
-plt.savefig("plots/smFISH_mRNA_counts.pdf")
+plt.savefig("plots/smFISH_mRNA_summed.pdf")
 
 
 """

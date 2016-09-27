@@ -40,7 +40,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects import r
 from rpy2 import robjects as ro
 import scipy.stats as stats
-
+from scipy import interpolate
 from dba import dba
 from dba import align_to
 
@@ -48,6 +48,82 @@ from rpy2.robjects.vectors import DataFrame as RDataFrame
 from rpy2 import rinterface
 from rpy2.robjects import conversion
 
+def zero_crossing(data, offset):
+	new_data = data - offset
+	zc = np.where(np.diff(np.signbit(new_data)))[0]
+	return zc[0]
+
+def randomvariate(pdf,n=100, xmin=0, xmax = 1):
+	x = np.linspace(xmin,xmax,1000)
+	y = pdf(x)
+	pmin = 0.
+	pmax = y.max()
+
+	# Counters
+	naccept = 0 
+	ntrial = 0
+
+	# Keep generating numbers until we achieve the desired n
+	ran = []
+	while naccept < n:
+		x = np.random.uniform(xmin,xmax)
+		y = np.random.uniform(pmin,pmax)
+
+		if y < pdf(x):
+			ran.append(x)
+			naccept += 1
+			ntrial += 1
+
+	ran = np.asarray(ran)
+	return ran
+
+def get_individual_prior(cell_name, gene):
+	list_of_cells_r = ro.vectors.StrVector([cell_name])
+	gene_name = gene_name = """'""" + gene + """'"""
+
+	r("list_of_cells = " + list_of_cells_r.r_repr())
+	r("""gene_counts = counts_data_int[c(""" + gene_name + ""","mt-Atp8"),]""")
+	r("""ind_posterior = scde.posteriors(models = o.ifm[list_of_cells,], gene_counts, o.prior, n.cores = 4)""")
+	r("ip = ind_posterior[" + gene_name + ",]")
+	
+	fpms = ro.r("colnames(ind_posterior)")
+	fpms = np.float32(pandas2ri.ri2py(fpms))
+
+	ip = ro.r("ip")
+	ip = np.float32(pandas2ri.ri2py(ip))
+
+	return fpms, ip
+
+def get_joint_posterior(cell_names, gene):
+	list_of_cells_r = ro.vectors.StrVector(cell_names)
+	gene_name = gene_name = """'""" + gene + """'"""
+
+	r("list_of_cells = " + list_of_cells_r.r_repr())
+	r("""gene_counts = counts_data_int[c(""" + gene_name + ""","mt-Atp8"),]""")
+	r("""joint_posterior = scde.posteriors(models = o.ifm[list_of_cells,], gene_counts, o.prior, n.cores = 4)""")
+	r("jp = joint_posterior[" + gene_name + ",]")
+	
+	fpms = ro.r("colnames(joint_posterior)")
+	fpms = np.float32(pandas2ri.ri2py(fpms))
+
+	jp = ro.r("jp")
+	jp = np.float32(pandas2ri.ri2py(jp))
+
+	return fpms, jp
+
+def interp_prior(cell_name = None, gene_name = None):
+	fpms, ip = get_individual_prior(cell_name, gene_name)
+	ip_rescale = ip/ip.max()
+	loc = zero_crossing(ip_rescale, 0.005)
+
+	limits = (np.log2(fpms[loc.min()]+1), np.log2(fpms[loc.max()]+1))
+
+	return interpolate.interp1d(np.log2(fpms+1), ip), limits
+
+def sample_prior(cell_name = None, gene_name = None):
+	f, limits = interp_prior(cell_name, gene_name)
+	ran = randomvariate(f, xmin = limits[0], xmax = limits[1])
+	return ran
 
 def computeMI(P):
 
@@ -59,8 +135,10 @@ def computeMI(P):
 	px_tile = np.tile(px, (P.shape[1], 1))
 	py_tile = np.tile(py, (P.shape[1],1)).T
 
+	Px = P/px_tile
+	Px /= Px.max(axis = 0)
 
-	temp = P * np.log2(P/(px_tile*py_tile))
+	temp = Px * np.log2(P/(px_tile*py_tile))
 	return temp.sum()
 
 
@@ -85,7 +163,11 @@ scde = importr("scde")
 # Load data sets in R
 r("""load("/scratch/PI/mcovert/dvanva/sequencing/all_cells_scde_fit_linear.RData")""")
 r("""load("/scratch/PI/mcovert/dvanva/sequencing/counts_data.RData")""")
+
+r("o.prior = scde.expression.prior(models = o.ifm, counts = counts_data_int, length.out = 400, max.value = 10, show.plot = FALSE )")
 r("o.fpm = scde.expression.magnitude(o.ifm, counts = counts_data_int)")
+
+
 fpm = pd.read_csv('/scratch/PI/mcovert/dvanva/sequencing/fpms.csv', index_col = 0)
 logfpm = np.log2(fpm + 1)
 
@@ -96,13 +178,16 @@ direc = '/scratch/PI/mcovert/dvanva/sequencing/'
 all_cell_file = 'all_cells_qc_complete.pkl'
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 
-time_points = [75, 150, 300]
-cluster_list = [0,1,2]
+time_points = [75,150,300]
 color_dict = {'0':'g', '1':'r', '2':'b'}
 # list_of_genes = ['Ccl3', 'Ccl4', 'Ccl5', 'Cxcl10', 'Il27','Saa3']
 # list_of_genes = ['Ccl2', 'Ccl3', 'Ccl4', 'Ccl5', 'Ccl6', 'Ccl7', 'Ccl9', 'Ccl11', 'Ccl17', 'Ccl20', 'Ccl22', 'Ccl24', 'Ccl25', 'Ccl28']
 # list_of_genes += ['Cxcl1', 'Cxcl2', 'Cxcl3', 'Cxcl5', 'Cxcl9', 'Cxcl10', 'Cxcl11', 'Cxcl14', 'Cxcl15', 'Cxcl16', 'Cxcl17']
-list_of_genes = ['Ccl3', 'Ccl4', 'Ccl5', 'Cxcl10', 'Saa3', 'Il1f9']
+# list_of_genes = ['Ccl3', 'Ccl4', 'Ccl5', 'Cxcl10']
+# list_of_genes = ['Nupr1', 'Cxcl10', 'Ccl5', 'Il27', 'Lilrb4', 'Oasl1', 'Icam1', 'Nfkbie', 'Irg1', 'Marcksl1', 'Slfn2', 'Gp49a', 'Spp1', 'Ccl3', 'Ccl4', 'Plaur', 'Srgn', 'Pim1', 'Traf1', 'Btg2', 'Ier3', 'Phlda1', 'Kdm6b', 'Nfkbia', 'Nfkbiz', 'Tfec', 'Malt1', 'Nlrp3', 'Sdc4', 'Cd83', 'Tnfaip3', 'Il1a', 'Il1b', 'Sat1', 'Cxcl3', 'Saa3', 'Sod2', 'Csf3', 'Cxcl2', 'Tnf', 'Il1f9', 'Tnfsf9']
+# list_of_genes = ['Ccl3', 'Ccl4', 'Ccl5', 'Cxcl10', 'Saa3', 'Cxcl2', 'Nupr1', 'Irg1', 'Tnf', 'Nfkbia', 'Nfkbie', 'Nfkbiz', 'Tnfaip3','Dynamics']
+list_of_genes = ['Ccl3', 'Ccl4', 'Ccl5', 'Cxcl10', 'Saa3', 'Cxcl2', 'Tnf', 'Nfkbia', 'Tnfaip3','Dynamics']
+
 for time_point in time_points:
 	all_cells = []
 	cell_names = []
@@ -160,80 +245,111 @@ for time_point in time_points:
 			all_cells += [cell]
 			cell_names += [cell.id]
 
-	# if time_point == 75:
-	# 	cluster_list = [0,1]
-	# else:
-	# 	cluster_list = [0,1,2]
-	# for cluster in cluster_list:
-	# 	print cluster
-	# 	cell_names = []
-	# 	for cell in all_cells:
-	# 		if cell.clusterID == cluster:
-	# 			cell_names += [cell.id]
+	all_cells_new = []
+	if time_point == 75:
+		cluster_list = [0,1]
+	else:
+		cluster_list = [0,1,2]
+	for cluster in cluster_list:
+		print cluster
+		cell_names = []
+		for cell in all_cells:
+			if cell.clusterID == cluster:
+				cell_names += [cell.id]
+				all_cells_new += [cell]
+	all_cells = all_cells_new
 
-	reduced_fpm = logfpm.loc[:,cell_names]
+	for cell in all_cells:
+		logfpm.loc['Dynamics', cell.id] = np.sum(cell.NFkB_dynamics)
+		logfpm.loc['ClusterID', cell.id] = cell.clusterID
+	reduced_fpm = logfpm.loc[list_of_genes,cell_names]
 
+
+	# print reduced_fpm
+	# print reduced_fpm.loc['ClusterID',:]
 	counter1 = 0
 	for gene1 in list_of_genes:
 		counter2 = 0
 		for gene2 in list_of_genes:
+			print gene1, gene2
+			# if counter1 > counter2:
+
+			if gene1 == gene2:
+
+				Z = np.rot90(np.eye(100))+1e-8
+				corr_matrix[counter1, counter2]  = computeMI(Z)
+
+				axes[counter1, counter2].imshow(Z, cmap = plt.get_cmap('coolwarm'), interpolation = 'none')
+
 			if gene1 != gene2:
+				# gene1_list = []
+				# gene2_list = []
+				# for cell_name in cell_names:
+
+
+				# 	gene1_list += list(sample_prior(cell_name = cell_name, gene_name = gene1))
+				# 	gene2_list += list(sample_prior(cell_name = cell_name, gene_name = gene2))
+
+				# gene1_array = np.array(gene1_list)
+				# gene2_array = np.array(gene2_list)
+
+				# Non sampled implementation
 				gene1_array = reduced_fpm.loc[gene1,:]
 				gene2_array = reduced_fpm.loc[gene2,:]
 
-				xmin = gene1_array.min()
-				xmax = gene1_array.max()
+				if gene1_array.sum() > 0 and gene2_array.sum() > 0:
 
-				ymin = gene2_array.min()
-				ymax = gene2_array.max()
+					xmin = gene1_array.min()
+					xmax = gene1_array.max()
 
-				X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
-				positions = np.vstack([X.ravel(), Y.ravel()])
-				values = np.vstack([gene1_array, gene2_array])
-				kernel = scipy.stats.gaussian_kde(values)
-				Z = np.reshape(kernel(positions).T, X.shape)
-				Z = np.rot90(Z)
+					ymin = gene2_array.min()
+					ymax = gene2_array.max()
 
-				# P = P/P.sum()
-				# px = P.sum(axis = 1)/P.sum(axis = 1).sum()
-				# py = P.sum(axis = 0)/P.sum(axis = 0).sum()
+					X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+					positions = np.vstack([X.ravel(), Y.ravel()])
+					values = np.vstack([gene1_array, gene2_array])
+					kernel = scipy.stats.gaussian_kde(values)
+					Z = np.reshape(kernel(positions).T, X.shape)
+					Z = np.rot90(Z)
 
+					px = Z.sum(axis = 1)/Z.sum(axis = 1).sum()
+					px_tile = np.tile(px, (Z.shape[1], 1))
+					Zx = Z/px_tile
+					Zx /= Zx.max(axis = 0)
 
-				# px_tile = np.tile(px, (P.shape[1], 1))
-				# py_tile = np.tile(py, (P.shape[1],1)).T
+					axes[counter1, counter2].imshow(Zx, cmap = plt.get_cmap('coolwarm'), interpolation = 'none', extent = [xmin, xmax, ymin, ymax])
+					# axes[counter1,counter2].scatter(gene1_array, gene2_array, s = 3, color = 'b')
+					axes[counter1,counter2].set_xlabel(gene1, fontsize = 14)
+					axes[counter1,counter2].set_ylabel(gene2, fontsize = 14)
 
-				axes[counter1, counter2].imshow(Z, cmap = plt.get_cmap('coolwarm'), interpolation = 'none', extent = [xmin, xmax, ymin, ymax])
-				# axes[counter1,counter2].scatter(gene1_array, gene2_array, s = 3, color = color_dict[str(cluster)])
-				axes[counter1,counter2].set_xlabel(gene1)
-				axes[counter1,counter2].set_ylabel(gene2)
-
-				corr_matrix[counter1, counter2]  = computeMI(Z)
+					# corr_matrix[counter1, counter2]  = computeMI(Z)
 			counter2 += 1
 		counter1 += 1
 
+	print corr_matrix
 	fig.tight_layout()
 	plt.savefig("plots/trial_32_gene_gene_scatter_" + str(time_point) + "min.pdf")
 
-	Y = sch.linkage(corr_matrix, method = 'ward')
-	Z = sch.dendrogram(Y, orientation = 'right', color_threshold = 0.5*np.amax(Y[:,2]))
-	index = Z['leaves']
-	corr1 = corr_matrix[index, :]
-	corr_ordered = corr1[:,index]
-	list_of_genes_ordered = [list_of_genes[i] for i in index]
+	# Y = sch.linkage(corr_matrix, method = 'ward')
+	# Z = sch.dendrogram(Y, orientation = 'right', color_threshold = 0.5*np.amax(Y[:,2]))
+	# index = Z['leaves']
+	# corr1 = corr_matrix[index, :]
+	# corr_ordered = corr1[:,index]
+	# list_of_genes_ordered = [list_of_genes[i] for i in index]
 
-	fig = plt.figure()
-	ax = fig.add_subplot(111)
+	# fig = plt.figure()
+	# ax = fig.add_subplot(111)
 
-	ax.matshow(corr_ordered, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none') #, vmin = -1, vmax = 1)
-	ticks = np.arange(0,corr_ordered.shape[0],1)
-	ax.xaxis.set_ticks_position('bottom')
-	ax.set_xticks(ticks)
-	ax.set_yticks(ticks)
-	ax.set_xticklabels(list_of_genes_ordered, fontsize = 5, rotation = 270)
-	ax.set_yticklabels(list_of_genes_ordered, fontsize = 5)
-	ax.tick_params(width = 0, length = 0)
+	# ax.matshow(corr_matrix, aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none') #, vmin = -1, vmax = 1)
+	# ticks = np.arange(0,corr_matrix.shape[0],1)
+	# ax.xaxis.set_ticks_position('bottom')
+	# ax.set_xticks(ticks)
+	# ax.set_yticks(ticks)
+	# ax.set_xticklabels(list_of_genes, fontsize = 5, rotation = 270)
+	# ax.set_yticklabels(list_of_genes, fontsize = 5)
+	# ax.tick_params(width = 0, length = 0)
 
-	plt.savefig("plots/trial_32_MI_heatmap" + str(time_point) + "min.pdf")
+	# plt.savefig("plots/trial_32_MI_heatmap" + str(time_point) + "min.pdf")
 
 
 

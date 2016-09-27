@@ -23,7 +23,7 @@ import numpy
 import scipy
 import scipy.io as sio 
 import pyensembl
-import h5py
+# import h5py
 import pandas as pd
 import numpy as np
 import matplotlib as mpl
@@ -75,10 +75,10 @@ all_cell_file = 'all_cells_qc_complete.pkl'
 all_cells_total = pickle.load(open(os.path.join(direc,all_cell_file)))
 
 # Determine which genes to look at
-# genes_to_plot = ["Ccl5", "Ccl3", "Saa3", "Il1f9", "Hdc", "Prdx1"]
+genes_to_plot = ["Ccl5", "Ccl3", "Saa3", "Il1f9", "Hdc", "Prdx1"]
 # genes_to_plot = ["Saa3", "Il1f9", "Il6", "Csf3", "Gp49a", "Tm6sf2", "Il17rc", "Zfyve1", "Ric8b", "Sipa1l3", "Zfp850", "Zfp661", "Nod1", "Trim14", "Trem1", "Athl1","Gm11007", "Gm2007"]
 
-genes_to_plot = ['Wrb', 'Cxcl3', 'Tnfaip3', 'Tnfaip2', 'Gm6377', 'Blvrb', 'Bcl6b', 'Gpr21', 'Rsl1', 'Nfatc1', 'Nfkbiz', 'Phf11d', 'Tfec', 'Phf11a', 'Fas', 'Gpx1', 'Ccnd1', 'Flrt3', 'Cd247', 'Tslp', 'Atp6v0d2', 'Il1f6', 'Rnf213', 'Marcksl1', 'Abcg1', 'Gm8818', 'Nlrp3', 'Pde6b', 'Rrm2', 'Mbnl1', 'Ptpn14', 'Odc1', 'Fv1', 'Ptgs2', 'Ddit3', 'Slc25a2', 'Cfb', 'Mmp3', 'Ptprg', 'Cxcl10', 'Ly86', 'D430042O09Rik', 'Areg', 'Vmn2r90', 'Ier3', 'Cd14', 'Marcks', 'Angptl2', 'Rel', 'Prkg2', 'Afp', 'Serpinb2', 'Adh7', 'Btg2', 'Bdh2', 'Gm18445', 'Sdc4', 'Tnfsf9', 'Tpbg', 'Prr14l', 'Il27', 'Tk1', 'Angpt2', 'Tmem171', 'Ccl2', 'Ccl3', 'Ccl4', 'Sqstm1', 'Cd83', 'Slc7a11', 'Srl', 'Oasl1', 'Hsp90aa1', 'Slc9b2', 'Pde4b', 'Rasgrp3', 'Calcrl', 'Fosb', 'Egr1', 'Stx11', 'Colec12', 'Gmnn', 'Gpr84', 'Cxcl1', 'N28178', 'Cxcl2', 'Sod2', 'Zdhhc14', 'Mt2', 'Ttc7', 'Srgap3', 'Serpinb8', 'Srxn1', 'Phlda1', 'Apol9a', 'Bcl2a1d', 'Traf1', 'Serpinb9e', 'Pim1', 'Gm2004', 'Il1f9', 'Prdx1', 'Ccrl2', 'Slc1a2', 'Gem', 'Procr', 'Hmgcs1', 'Gm8325', 'AI607873', 'Bcl2l11', 'Col7a1', 'Irg1', 'Saa3', 'Gm28677', 'Tnf', 'Hdc', 'Arntl2', 'Sla', 'Il6', 'Dlg3', 'Klhl23', 'F8', 'Gpr183', 'Shc4', 'Fabp4', 'Atf3', 'Bco2', 'Ccl20', 'Ifit2', 'Errfi1', 'Lif', 'Kbtbd11', 'Sat1', 'Plaur', 'Bahcc1', 'Hmox1', 'Ak5', 'Id1', 'Mef2c', 'Icam1', 'Pcdh15', 'Slfn2', 'A930018M24Rik', 'Map1b', 'Lilrb4', 'Clec4e', 'Nfkbia', 'Csf3', 'Klhl6', 'Akr1b8', 'Emp1', 'Srgn', 'Zc3h12c', 'Prl2c2', 'Cela1', 'Slpi', 'Rasgef1b', 'Rnase4', 'Il23a', 'Mmp13', 'Plk3', 'Plk2', 'Rassf4', 'Stap1', 'Cish', 'Kdm6b', 'Il1a', 'Il1b', 'Gp49a', 'Malt1', 'Nabp1', 'Kif14', 'Ttc41', 'Rab31', 'Gsta1', 'Ppp1r15a', 'Hcar2', 'Myo18b', 'Mtss1', 'Ccr3', 'C130050O18Rik', 'Ccl5']
+# genes_to_plot = ['Wrb', 'Cxcl3', 'Tnfaip3', 'Tnfaip2', 'Gm6377', 'Blvrb', 'Bcl6b', 'Gpr21', 'Rsl1', 'Nfatc1', 'Nfkbiz', 'Phf11d', 'Tfec', 'Phf11a', 'Fas', 'Gpx1', 'Ccnd1', 'Flrt3', 'Cd247', 'Tslp', 'Atp6v0d2', 'Il1f6', 'Rnf213', 'Marcksl1', 'Abcg1', 'Gm8818', 'Nlrp3', 'Pde6b', 'Rrm2', 'Mbnl1', 'Ptpn14', 'Odc1', 'Fv1', 'Ptgs2', 'Ddit3', 'Slc25a2', 'Cfb', 'Mmp3', 'Ptprg', 'Cxcl10', 'Ly86', 'D430042O09Rik', 'Areg', 'Vmn2r90', 'Ier3', 'Cd14', 'Marcks', 'Angptl2', 'Rel', 'Prkg2', 'Afp', 'Serpinb2', 'Adh7', 'Btg2', 'Bdh2', 'Gm18445', 'Sdc4', 'Tnfsf9', 'Tpbg', 'Prr14l', 'Il27', 'Tk1', 'Angpt2', 'Tmem171', 'Ccl2', 'Ccl3', 'Ccl4', 'Sqstm1', 'Cd83', 'Slc7a11', 'Srl', 'Oasl1', 'Hsp90aa1', 'Slc9b2', 'Pde4b', 'Rasgrp3', 'Calcrl', 'Fosb', 'Egr1', 'Stx11', 'Colec12', 'Gmnn', 'Gpr84', 'Cxcl1', 'N28178', 'Cxcl2', 'Sod2', 'Zdhhc14', 'Mt2', 'Ttc7', 'Srgap3', 'Serpinb8', 'Srxn1', 'Phlda1', 'Apol9a', 'Bcl2a1d', 'Traf1', 'Serpinb9e', 'Pim1', 'Gm2004', 'Il1f9', 'Prdx1', 'Ccrl2', 'Slc1a2', 'Gem', 'Procr', 'Hmgcs1', 'Gm8325', 'AI607873', 'Bcl2l11', 'Col7a1', 'Irg1', 'Saa3', 'Gm28677', 'Tnf', 'Hdc', 'Arntl2', 'Sla', 'Il6', 'Dlg3', 'Klhl23', 'F8', 'Gpr183', 'Shc4', 'Fabp4', 'Atf3', 'Bco2', 'Ccl20', 'Ifit2', 'Errfi1', 'Lif', 'Kbtbd11', 'Sat1', 'Plaur', 'Bahcc1', 'Hmox1', 'Ak5', 'Id1', 'Mef2c', 'Icam1', 'Pcdh15', 'Slfn2', 'A930018M24Rik', 'Map1b', 'Lilrb4', 'Clec4e', 'Nfkbia', 'Csf3', 'Klhl6', 'Akr1b8', 'Emp1', 'Srgn', 'Zc3h12c', 'Prl2c2', 'Cela1', 'Slpi', 'Rasgef1b', 'Rnase4', 'Il23a', 'Mmp13', 'Plk3', 'Plk2', 'Rassf4', 'Stap1', 'Cish', 'Kdm6b', 'Il1a', 'Il1b', 'Gp49a', 'Malt1', 'Nabp1', 'Kif14', 'Ttc41', 'Rab31', 'Gsta1', 'Ppp1r15a', 'Hcar2', 'Myo18b', 'Mtss1', 'Ccr3', 'C130050O18Rik', 'Ccl5']
 
 genes_to_plot = genes_to_plot[0:60]
 """
@@ -183,9 +183,10 @@ for time_point in times_to_analyze:
 
 	index = Z['leaves']
 	genes_ordered = genes_matrix[index,:]
-	im = ax_heatmap_1.matshow(genes_ordered[0:cluster_len_1], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none', vmin = 0, vmax = 20)
-	im = ax_heatmap_2.matshow(genes_ordered[cluster_len_1:cluster_len_2], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none', vmin = 0, vmax = 20)
-	im = ax_heatmap_3.matshow(genes_ordered[cluster_len_2:], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap('coolwarm'), interpolation = 'none', vmin = 0, vmax = 20)
+	col = 'coolwarm'
+	im = ax_heatmap_1.matshow(genes_ordered[0:cluster_len_1], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap(col), interpolation = 'none', vmin = 0, vmax = 20)
+	im = ax_heatmap_2.matshow(genes_ordered[cluster_len_1:cluster_len_2], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap(col), interpolation = 'none', vmin = 0, vmax = 20)
+	im = ax_heatmap_3.matshow(genes_ordered[cluster_len_2:], aspect = 'auto', origin = 'lower', cmap = plt.get_cmap(col), interpolation = 'none', vmin = 0, vmax = 20)
 
 	# fig.colorbar(im, ticks = [0, 20], orientation = 'vertical')
 
@@ -201,5 +202,5 @@ for time_point in times_to_analyze:
 	ax_heatmap_3.set_yticks([])
 	ax_heatmap_3.set_xticks([])
 
-	plt.savefig("plots/trial_21_300min_every_gene.pdf")
+	plt.savefig("plots/trial_21_300min_every_gene_colormaps.pdf")
 
